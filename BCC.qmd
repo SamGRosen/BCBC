@@ -1,0 +1,111 @@
+```{r}
+ # Libraries
+library(FastKNN)
+library(dynamicTreeCut)
+library(sparcl)
+library(igraph)
+
+```
+
+```{r}
+
+solve_alpha = function(A, lambda) {
+  f = function(alpha) {
+    s = sum(pmax(alpha / A - lambda, 0))
+    return(s / 2 - 1)
+  }
+  a = uniroot(f, c(0.0, 1000.0), tol = 1e-10)$root
+  return(a)
+}
+
+bcc = function(X,
+               M,
+               lambda,
+               gamma = 1000,
+               k = 5,
+               tmax = 30) {
+  n = dim(X)[1]
+  p = dim(X)[2]
+  w = runif(p)
+  w = w / sum(w)
+  col_sum_sq = numeric(p)
+  B = numeric(p)
+  for (t in 1:tmax) {
+    # scaled_columns = t(t(X) * sqrt(w^2 + lambda * w))  # Equivalent, may be faster in some cases
+    scaled_columns = sweep(X, 2, sqrt(w^2 + lambda * w), "*")
+    D = as.matrix(dist(scaled_columns)) ^ 2
+
+    nn = matrix(0, n, k) # n x k
+    for (i in 1:n) {  # k+1 and filter out self assignment
+      neighbors = k.nearest.neighbors(i, D, k+1)
+      nn[i,] = neighbors[which(neighbors != i)][1:k]
+    }
+    W = matrix(0, n, n)
+    for (i in 1:n) {
+      W[i, nn[i,]] = exp(-0.5 * D[i, nn[i,]] / p)
+    }
+
+    # https://stackoverflow.com/a/74645749
+    W_sum_at_nn <- cbind(apply(nn, 2, function(z) {
+      W[cbind(seq_along(z), z)] + W[cbind(z, seq_along(z))]
+    }))
+
+    numer_left <- gamma * t(sapply(1:n, function(m) {
+      W_sum_at_nn[m,] %*% M[nn[m,],]
+    }))
+    numer_right = sweep(X, 2, w^2 + lambda * w, "*")
+
+    denom_left = rowSums(W_sum_at_nn) * gamma
+    denom_right = w^2 + lambda * w
+    denom = outer(denom_left, denom_right, "+")
+    
+    M = (numer_left + numer_right) / denom
+    M[, which(w <= 0)] = 0
+
+    col_sum_sq = colSums((X - M)^2)
+    alpha = solve_alpha(col_sum_sq, lambda)
+    w = pmax(alpha / col_sum_sq - lambda, 0) / 2
+  }
+  return(list(M, w))
+}
+
+```
+
+```{r}
+X = read.csv('movement_libras.csv', head = FALSE)
+X = data.matrix(X)
+toss = X[, 91]
+X = X[, -91]
+I3 = which(toss == 3)
+I4 = which(toss == 4)
+I5 = which(toss == 5)
+I7 = which(toss == 7)
+I11 = which(toss == 11)
+I12 = which(toss == 12)
+I = c(I3, I4, I5, I7, I11, I12)
+X = X[I, ]
+toss = toss[I]
+p = dim(X)[2]
+for (i in 1:p) {
+  X[, i] = (X[, i] - mean(X[, i])) / sd(X[, i])
+}
+```
+
+
+```{r}
+
+l=bcc(X,X,lambda=0.002,gamma=10,tmax=100)
+
+```
+
+```{r}
+h = hclust(dist(l[[1]]), method = 'average')
+c = cutreeDynamic(h, distM = as.matrix(dist(l[[1]])))
+```
+
+
+```{r}
+compare(toss, c, 'adjusted.rand')
+compare(toss, c, 'nmi')
+
+```
