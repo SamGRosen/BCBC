@@ -4,11 +4,10 @@ library(FastKNN)
 library(dynamicTreeCut)
 library(sparcl)
 library(igraph)
-
+library(cvxbiclustr)
 ```
 
 ```{r}
-
 solve_alpha = function(A, lambda) {
   f = function(alpha) {
     s = sum(pmax(alpha / A - lambda, 0))
@@ -18,18 +17,80 @@ solve_alpha = function(A, lambda) {
   return(a)
 }
 
+
+bcc_transpose = function(X, # Cluster the columns while reweighting them
+                         lambda,
+                         gamma = 1000,
+                         k = 5,
+                         tmax = 30,
+                         w_0 = NA) {
+  n = dim(X)[1]
+  p = dim(X)[2]
+  if(any(is.na(w_0))) {
+    w = runif(p)
+  } else{
+    w = w_0
+  }
+
+  w = w / sum(w)
+  col_sum_sq = numeric(p)
+  M = X
+  for (t in 1:tmax) {
+    # scaled_columns = t(t(X) * sqrt(w^2 + lambda * w))  # Equivalent, may be faster in some cases
+    scaled_columns = sweep(X, 2, sqrt(w^2 + lambda * w), "*")
+    D = as.matrix(dist(t(scaled_columns))) ^ 2
+
+    nn = matrix(0, p, k) # p x k  since weighting columns
+    for (i in 1:p) {  # k+1 and filter out self assignment
+      neighbors = k.nearest.neighbors(i, D, k+1)
+      nn[i,] = neighbors[which(neighbors != i)][1:k]
+    }
+    W = matrix(0, p, p)
+    for (i in 1:p) {
+      W[i, nn[i,]] = exp(-0.5 * D[i, nn[i,]] / n)  # TODO replace 0.5 with phi
+    }
+
+    # https://stackoverflow.com/a/74645749
+    W_sum_at_nn <- cbind(apply(nn, 2, function(z) {
+      W[cbind(seq_along(z), z)] + W[cbind(z, seq_along(z))]
+    }))
+
+    numer_left <- gamma * t(sapply(1:n, function(m) {
+      W_sum_at_nn[m,] %*% M[,nn[m,]]
+    }))
+    numer_right = sweep(X, 2, w^2 + lambda * w, "*")
+
+    denom_left = rowSums(W_sum_at_nn) * gamma
+    denom_right = w^2 + lambda * w
+    denom = outer(denom_left, denom_right, "+")
+    
+    M = (numer_left + numer_right) / denom
+    M[, which(w <= 0)] = 0
+
+    col_sum_sq = colSums((X - M)^2)
+    alpha = solve_alpha(col_sum_sq, lambda)
+    w = pmax(alpha / col_sum_sq - lambda, 0) / 2
+  }
+  return(list(M=M, w=w))
+}
+
 bcc = function(X,
-               M,
                lambda,
                gamma = 1000,
                k = 5,
-               tmax = 30) {
+               tmax = 30,
+               w_0 = NA) {
   n = dim(X)[1]
   p = dim(X)[2]
-  w = runif(p)
+  if(any(is.na(w_0))) {
+    w = runif(p)
+  } else{
+    w = w_0
+  }
+
   w = w / sum(w)
   col_sum_sq = numeric(p)
-  B = numeric(p)
+  M = X
   for (t in 1:tmax) {
     # scaled_columns = t(t(X) * sqrt(w^2 + lambda * w))  # Equivalent, may be faster in some cases
     scaled_columns = sweep(X, 2, sqrt(w^2 + lambda * w), "*")
@@ -66,9 +127,8 @@ bcc = function(X,
     alpha = solve_alpha(col_sum_sq, lambda)
     w = pmax(alpha / col_sum_sq - lambda, 0) / 2
   }
-  return(list(M, w))
+  return(list(M=M, w=w))
 }
-
 ```
 
 ```{r}
@@ -93,19 +153,155 @@ for (i in 1:p) {
 
 
 ```{r}
-
-l=bcc(X,X,lambda=0.002,gamma=10,tmax=100)
+# profvis::profvis({
+# }
+# )
+l=bcc(X,lambda=0.002,gamma=10,tmax=100)
 
 ```
 
 ```{r}
 h = hclust(dist(l[[1]]), method = 'average')
-c = cutreeDynamic(h, distM = as.matrix(dist(l[[1]])))
+cut_result = cutreeDynamic(h, distM = as.matrix(dist(l[[1]])))
 ```
 
 
 ```{r}
-compare(toss, c, 'adjusted.rand')
-compare(toss, c, 'nmi')
+compare(toss, cut_result, 'adjusted.rand')
+compare(toss, cut_result, 'nmi')
+
+```
+
+
+```{r}
+
+bicobra <- function(X, lambda, gamma, k, tmax) {
+  n = dim(X)[1]
+  p = dim(X)[2]
+  U = X
+  P = matrix(0, nrow=n, ncol=p)
+  Q = matrix(0, nrow=p, ncol=n)
+  w <- runif(p)
+  w <- w/sum(w)
+
+  for(t in 1:tmax) {
+    # Do regular bcc
+    bcc_1 = bcc(U + P, lambda=lambda, gamma=gamma, k=k, tmax=tmax, w_0 = w)
+    Y = bcc_1$M
+    w = bcc_1$w
+    P = U + P - Y
+    # Do transposed bcc
+    bcc_2 = bcc_transpose(Y + Q, lambda=lambda, gamma=gamma, k=k, tmax=tmax, w_0 = w)
+    U = bcc_2$M
+    w = bcc_2$w
+    Q = Y + Q - U
+  }
+}
+```
+
+
+```{r}
+l=bicobra(X,lambda=0.002,k=5,gamma=10,tmax=100)
+```
+
+
+```{r}
+
+solve_alpha_prox = function(D_l, nu, q, lambda) {
+  D_nu = D_l / (1/nu + D_l)
+  f = function(alpha) {
+    s = sum(D_nu * pmax((alpha + q/nu) / D_l - lambda/2, 0))
+    return(s - 1)
+  }
+  a = uniroot(f, c(-min(q/nu), 10000000.0), tol = 1e-10)$root
+  return(a)
+}
+
+
+rscobra <- function(X, lambda, k=4, nu=1, gamma=10, phi=0.05, tmax=100, tol=1e-9, recalculate_weights=TRUE) {
+  n = dim(X)[1]
+  p = dim(X)[2]
+  Q <- X
+  q <- runif(p)
+  q <- q/sum(q)
+  for(t in 1:tmax) {
+    if(recalculate_weights || t==1) {
+      wts = gkn_weights(t(Q), k_row=k, k_col=k, phi=phi)
+      w_row <- wts$w_row
+      w_col <- wts$w_col
+      E_row <- wts$E_row
+      E_col <- wts$E_col
+    }
+
+    # Cobra has rows as features, columns as samples
+    cobra_result <- cobra(t(Q), E_row, E_col, w_row, w_col, gamma=gamma, max_iter=tmax)
+
+    # print(Q)
+    if(sum((t(cobra_result$U[[1]]) - Q)^2) < tol) {
+       Q <- t(cobra_result$U[[1]])
+       break
+    }
+    
+    Q <- t(cobra_result$U[[1]])
+    for(t2 in 1:tmax) {  # Coordinate wise minima of biconvex optimization
+      # Solve for Q with fixed w
+      w_sq <- q^2 + lambda * q
+      X_weighted <- sweep(X, 2, w_sq / (1/nu + w_sq), "*")
+      Q_weighted <- sweep(Q, 2, 1 / (1 + nu * w_sq), "*")
+      Q <- Q_weighted + X_weighted
+      
+      # Solve for w with fixed U
+      col_sum_sq = colSums((X - Q)^2)
+      alpha = solve_alpha_prox(col_sum_sq, nu, q, lambda)
+      new_q = (col_sum_sq) / (col_sum_sq + 1/nu) * pmax((alpha + q/nu) / col_sum_sq - lambda/2, 0)
+      
+      if(sum((new_q - q)^2) < tol) {
+        q = new_q
+        break
+      } 
+      q = new_q
+    }
+  }
+  
+  return(list(U=Q, w=q))
+}
+```
+
+```{r}
+l=rscobra(X, lambda=0.05,k=5,nu=0.5, gamma=1000,tmax=100, phi=0.5, recalculate_weights = TRUE, tol=1e-6)
+
+```
+
+```{r}
+X2 = read.csv('lung100.csv', head = FALSE)
+X2 = data.matrix(X2)
+p = dim(X2)[2]
+for (i in 1:p) {
+  X2[, i] = (X2[, i] - mean(X2[, i])) / sd(X2[, i])
+}
+
+```
+
+```{r}
+l=rscobra(X2, lambda=0.005,k=5,nu=2, gamma=30,tmax=100, phi=0.5, recalculate_weights = TRUE, tol=1e-6)
+```
+
+```{r}
+plot_matrix <- function(mat) {
+  df <- as.data.frame(mat) |>
+    mutate(row_num = row_number()) |>
+    pivot_longer(!row_num, names_to="col_num") |>
+    mutate(col_num = str_replace(col_num, "V", ""))
+  
+  ggplot(df, aes(x=col_num, y=row_num, fill=value)) +
+    geom_raster() +
+    scale_fill_gradient2(breaks = seq(-3, 3, 0.25)) +
+    theme(
+      axis.text.x=element_blank(), 
+      axis.ticks.x=element_blank()
+    )
+}
+
+plot_matrix(l$U)
 
 ```
