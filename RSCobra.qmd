@@ -207,6 +207,11 @@ centroid_rows <- function(mat, dist_mat, threshold) {
   row_adjacency <- as.matrix(dist_mat)
   row_adjacency[which(row_adjacency == 0)] <- 1
   row_adjacency[which(row_adjacency > threshold)] <- 0
+  
+  # Helps to sort through the communities, don't need names
+  colnames(row_adjacency) <- 1:ncol(row_adjacency)
+  rownames(row_adjacency) <- 1:nrow(row_adjacency)
+  
   row_clusters <- igraph::components(
     graph_from_adjacency_matrix(row_adjacency, mode = 'undirected', weighted = TRUE))
   
@@ -260,15 +265,22 @@ get_num_row_clusters <- function(mat, threshold) {
   return(clustering$cluster_info$no)
 }
 
-plot_matrix <- function(from_mat_df, fill_attr="value", alpha_weight=FALSE) {
+plot_matrix <- function(from_mat_df, fill_attr="value", alpha_weight=FALSE, bin_scale=FALSE) {
   if(alpha_weight) {
     raster <- geom_raster(aes(fill=.data[[fill_attr]], alpha=weight))
   } else {
     raster <- geom_raster(aes(fill=.data[[fill_attr]]))
   }
+  
+  if(!bin_scale) {
+    plot_scale = scale_fill_gradient2()
+  } else {
+    plot_scale = scale_fill_steps2(n.breaks = bin_scale)
+  }
+
   ggplot(from_mat_df, aes(x=order_col, y=order_row)) +
     raster +
-    scale_fill_gradient2() +
+    plot_scale +
     theme_minimal() +
     theme(
       axis.text.x=element_blank(), 
@@ -471,7 +483,7 @@ cv_500 <- tune_rscobra(X3, lambdas=c(0.001, 0.01, 0.1), nus=c(0.001, 0.01, 0.1),
 best_lung500_index <- which(cv_500$cv_data$eBIC == min(cv_500$cv_data$eBIC))
 best_lung500_run <- cv_500$all_runs[[best_lung500_index]]
 plot(sort(best_lung500_run$w))
-plot_matrix(mat_df(best_lung500_run, filter_weight=0))
+plot_matrix(mat_df(best_lung500_run, filter_weight=0), bin_scale=10)
 
 ```
 
@@ -486,6 +498,50 @@ cv_lym <- tune_rscobra(lym, lambdas=c(0.001, 0.01, 0.1), nus=c(0.001, 0.01, 0.1)
 best_lym_index <- which(cv_lym$cv_data$eBIC == min(cv_lym$cv_data$eBIC))
 best_lym_run <- cv_lym$all_runs[[best_lym_index]]
 plot(sort(best_lym_run$w))
-plot_matrix(mat_df(best_lym_run, filter_weight=0))
+plot_matrix(mat_df(best_lym_run, filter_weight=1/4026))
 
+plot_matrix(
+  mat_df(best_lym_run, filter_weight = 1/4000) |>
+    mutate(value =
+             case_when(value < -2 ~ -2,
+                       value > 2 ~ 2,
+                       TRUE ~ value)),
+  bin_scale = 10,
+  alpha_weight = TRUE
+)
+
+plot_matrix(
+  mat_df(best_lym_run, filter_weight = 1/4000) |>
+    mutate(value = value / sd(value)),
+  bin_scale = 10
+)
+```
+
+```{r}
+srbct <- t(read.csv("./srbct.x.txt", header=FALSE, sep=" "))
+srbct <- scale(srbct)
+
+
+cv_srbct <- tune_rscobra(srbct, lambdas=c(0.001, 0.01, 0.1), nus=c(0.001, 0.01, 0.1), gammas=c(10, 100, 1000))
+
+best_srbct_index <- which(cv_srbct$cv_data$eBIC == min(cv_srbct$cv_data$eBIC))
+best_srbct_run <- cv_srbct$all_runs[[best_srbct_index]]
+plot(sort(best_srbct_run$w))
+plot_matrix(mat_df(best_srbct_run, filter_weight=1/4026))
+
+plot_matrix(
+  mat_df(best_srbct_run, filter_weight = 1/4000) |>
+    mutate(value =
+             case_when(value < -2 ~ -2,
+                       value > 2 ~ 2,
+                       TRUE ~ value)),
+  bin_scale = 10,
+  alpha_weight = TRUE
+)
+
+plot_matrix(
+  mat_df(best_srbct_run, filter_weight = 1/4000) |>
+    mutate(value = value / sd(value)),
+  bin_scale = 10
+)
 ```
