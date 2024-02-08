@@ -2,14 +2,15 @@ library(cvxbiclustr)
 library(tidyverse)
 library(dbscan)
 library(FNN)
+library(future.apply)
 
 solve_alpha_prox = function(D_l, nu, q, lambda) {
-  D_nu = D_l / (1 / nu + D_l)
-  f = function(alpha) {
-    s = sum(D_nu * pmax((alpha + q / nu) / D_l - lambda / 2, 0))
+  D_nu <- D_l / (1 / nu + D_l)
+  f <- function(alpha) {
+    s <- sum(D_nu * pmax((alpha + q / nu) / D_l - lambda / 2, 0))
     return(s - 1)
   }
-  a = uniroot(f, c(-min(q / nu), 10000.0), tol = 1e-8)$root
+  a <- uniroot(f, c(-min(q / nu), 10000.0), tol = 1e-8)$root
   return(a)
 }
 
@@ -58,7 +59,6 @@ fast_gkn_weights <- function(X, k_row, k_col, phi, approx = 0) {
     ) |>
     distinct(from_node, to_node, .keep_all = TRUE)
   
-  # Need to fix this to only sum over edges used
   all_row_dist <- all_row_knn$dist[cbind(unique_row_edges$from_node,
                                          unique_row_edges$neighbor_index)]
   all_col_dist <- all_col_knn$dist[cbind(unique_col_edges$from_node,
@@ -98,8 +98,8 @@ rscobra <- function(X,
                     approx = 0,
                     threshold = 0,
                     progress = TRUE) {
-  n = dim(X)[1]
-  p = dim(X)[2]
+  n <- dim(X)[1]
+  p <- dim(X)[2]
   Q <- X
   q <- runif(p)
   q <- q / sum(q)
@@ -108,14 +108,15 @@ rscobra <- function(X,
   biconvex_diffs <- matrix(NA, nrow = tmax, ncol = tmax)
   w_path <- matrix(NA, nrow = tmax, ncol = p)
   
-  pb = txtProgressBar(min = 0,
-                      max = tmax,
-                      initial = 0)
+  if(progress) {
+    pb <- txtProgressBar(min = 0,
+                        max = tmax,
+                        initial = 0)
+  }
   for (t in 1:tmax) {
-    # Should recalculation use new weight vector?
     if (recalculate_weights || t == 1) {
       # wts = gkn_weights(t(Q), k_row=k_row, k_col=k_col, phi=phi, return_connectivity=FALSE)
-      wts = fast_gkn_weights(
+      wts <- fast_gkn_weights(
         t(Q),
         k_row = k_row,
         k_col = k_col,
@@ -156,24 +157,30 @@ rscobra <- function(X,
       Q <- Q_weighted + X_weighted
       
       # Solve for w with fixed U
-      col_sum_sq = colSums((X - Q) ^ 2)
-      alpha = solve_alpha_prox(col_sum_sq, nu, q, lambda)
-      new_q = (col_sum_sq) / (col_sum_sq + 1 / nu) * pmax((alpha + q / nu) / col_sum_sq - lambda /
+      col_sum_sq <- colSums((X - Q) ^ 2)
+      alpha <- solve_alpha_prox(col_sum_sq, nu, q, lambda)
+      new_q <- (col_sum_sq) / (col_sum_sq + 1 / nu) * pmax((alpha + q / nu) / col_sum_sq - lambda /
                                                             2, 0)
       
       q_diff <- sum((new_q - q) ^ 2)
       biconvex_diffs[t, t2] <- q_diff
       if (q_diff < tol) {
-        q = new_q
+        q <- new_q
         break
       }
-      q = new_q
+      q <- new_q
     }
     w_path[t, ] <- q
-    setTxtProgressBar(pb, t)
+    
+    if(progress) {
+      setTxtProgressBar(pb, t)
+    }
   }
-  close(pb)
-  
+
+  if(progress) {
+    close(pb)
+  }
+
   return(
     list(
       U = Q,
@@ -226,7 +233,7 @@ mat_df <- function(bcbc_result,
 }
 
 centroid_rows <- function(mat, dist_mat, threshold) {
-  to_return = mat
+  to_return <- mat
   row_adjacency <- as.matrix(dist_mat)
   row_adjacency[which(row_adjacency == 0)] <- 1
   row_adjacency[which(row_adjacency > threshold)] <- 0
@@ -235,8 +242,9 @@ centroid_rows <- function(mat, dist_mat, threshold) {
   colnames(row_adjacency) <- 1:ncol(row_adjacency)
   rownames(row_adjacency) <- 1:nrow(row_adjacency)
   
-  row_clusters <-
-    igraph::components(graph_from_adjacency_matrix(row_adjacency, mode = 'undirected', weighted = TRUE))
+  row_clusters <- igraph::components(graph_from_adjacency_matrix(row_adjacency,
+                                                                 mode = 'undirected',
+                                                                 weighted = TRUE))
   
   sorted_membership <- sort(row_clusters$membership)
   node_indices <- as.integer(names(sorted_membership))
@@ -260,13 +268,13 @@ centroid_rows <- function(mat, dist_mat, threshold) {
 thresholded_solution <- function(bcbc_result,
                                  percent_of_noise,
                                  cluster_w_weights = TRUE) {
-  to_return = list()
+  to_return <- list()
   w <- bcbc_result$w
   U <- bcbc_result$U
   lambda <- bcbc_result$lambda
   if (cluster_w_weights) {
-    w_vals = sqrt(w + lambda * w)
-    solution_mat = sweep(U, 2, w_vals, "*")
+    w_vals <- sqrt(w + lambda * w)
+    solution_mat <- sweep(U, 2, w_vals, "*")
   } else {
     solution_mat <- U
   }
@@ -289,31 +297,30 @@ get_num_row_clusters <- function(mat, threshold) {
   return(clustering$cluster_info$no)
 }
 
-plot_matrix <-
-  function(from_mat_df,
-           fill_attr = "value",
-           alpha_weight = FALSE,
-           bin_scale = FALSE) {
-    if (alpha_weight) {
-      raster <-
-        geom_raster(aes(fill = .data[[fill_attr]], alpha = weight))
-    } else {
-      raster <- geom_raster(aes(fill = .data[[fill_attr]]))
-    }
-    
-    if (!bin_scale) {
-      plot_scale = scale_fill_gradient2()
-    } else {
-      plot_scale = scale_fill_steps2(n.breaks = bin_scale)
-    }
-    
-    ggplot(from_mat_df, aes(x = order_col, y = order_row)) +
-      raster +
-      plot_scale +
-      theme_minimal() +
-      theme(axis.text.x = element_blank(),
-            axis.ticks.x = element_blank())
+plot_matrix <- function(from_mat_df,
+                        fill_attr = "value",
+                        alpha_weight = FALSE,
+                        bin_scale = FALSE) {
+  if (alpha_weight) {
+    raster <-
+      geom_raster(aes(fill = .data[[fill_attr]], alpha = weight))
+  } else {
+    raster <- geom_raster(aes(fill = .data[[fill_attr]]))
   }
+  
+  if (!bin_scale) {
+    plot_scale = scale_fill_gradient2()
+  } else {
+    plot_scale = scale_fill_steps2(n.breaks = bin_scale)
+  }
+  
+  ggplot(from_mat_df, aes(x = order_col, y = order_row)) +
+    raster +
+    plot_scale +
+    theme_minimal() +
+    theme(axis.text.x = element_blank(),
+          axis.ticks.x = element_blank())
+}
 
 get_cv_metrics <- function(X,
                            bcbc_run,
@@ -371,7 +378,8 @@ tune_rscobra <- function(X,
                          recalculate_weights = c(TRUE),
                          tols = c(1e-6),
                          weighted_clusters = TRUE,
-                         percent_noise = c(0.1)) {
+                         percent_noise = c(0.1),
+                         parallel=FALSE) {
   all_params <-
     expand.grid(
       lambda = lambdas,
@@ -384,32 +392,50 @@ tune_rscobra <- function(X,
       recalculate_weights = recalculate_weights,
       tol = tols
     )
-  
-  cv_data <- data.frame(all_params)
-  
+
+  cv_data <- data.frame(all_params) |>
+    mutate(index=row_number())
+
   all_runs <- list()
-  for (param_set in 1:nrow(all_params)) {
-    params <- all_params[param_set,]
-    result <- rscobra(
-      X,
-      lambda = params$lambda,
-      k_row = params$k_row,
-      k_col = params$k_col,
-      nu = params$nu,
-      gamma = params$gamma,
-      tmax = params$tmax,
-      phi = params$phi,
-      recalculate_weights = params$recalculate_weights,
-      tol = params$tol
-    )
-    cv_metrics <- get_cv_metrics(X,
-                                 result,
-                                 weighted_clusters = weighted_clusters,
-                                 percent_noise = percent_noise)
-    
-    cv_data[param_set, names(cv_metrics)] <- cv_metrics
-    all_runs[[param_set]] <- result
+
+  if(parallel) {
+    plan(multisession)
+  } else {
+    plan(sequential)
   }
+
+  future_results <- future_lapply(
+    1:nrow(all_params),
+    future.seed = TRUE,
+    function(param_set) {
+      params <- all_params[param_set,]
+      result <- rscobra(
+        X,
+        lambda = params$lambda,
+        k_row = params$k_row,
+        k_col = params$k_col,
+        nu = params$nu,
+        gamma = params$gamma,
+        tmax = params$tmax,
+        phi = params$phi,
+        recalculate_weights = params$recalculate_weights,
+        tol = params$tol,
+        progress = !parallel
+      )
+      cv_metrics <- get_cv_metrics(X,
+                                   result,
+                                   weighted_clusters = weighted_clusters,
+                                   percent_noise = percent_noise)
+
+      list(result = result, cv_metrics = cv_metrics)
+    })
+
+  for(param_set in 1:nrow(all_params)) {
+    all_runs[[param_set]] = future_results[[param_set]]$result
+    cv_metrics <- future_results[[param_set]]$cv_metrics
+    cv_data[param_set, names(cv_metrics)] <- cv_metrics
+  }
+
   return(list(all_runs = all_runs, cv_data = cv_data))
 }
 

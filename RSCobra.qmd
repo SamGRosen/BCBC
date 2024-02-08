@@ -28,7 +28,8 @@ checker <- gen_checkerboard(100, 200, 5, 10, 300, 1)
 rs_checker <- tune_rscobra(checker$X,
                            lambdas=c(0.001, 0.01, 0.1),
                            nus=c(0.001, 0.01, 0.1),
-                           gammas=c(10, 100, 1000))
+                           gammas=c(10, 100, 1000),
+                           parallel = TRUE)
 
 best_checker_index <- which(rs_checker$cv_data$eBIC == min(rs_checker$cv_data$eBIC))
 best_checker_run <- rs_checker$all_runs[[best_checker_index]]
