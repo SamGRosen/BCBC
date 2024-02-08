@@ -1,0 +1,470 @@
+library(cvxbiclustr)
+library(tidyverse)
+library(dbscan)
+library(FNN)
+
+solve_alpha_prox = function(D_l, nu, q, lambda) {
+  D_nu = D_l / (1 / nu + D_l)
+  f = function(alpha) {
+    s = sum(D_nu * pmax((alpha + q / nu) / D_l - lambda / 2, 0))
+    return(s - 1)
+  }
+  a = uniroot(f, c(-min(q / nu), 10000.0), tol = 1e-8)$root
+  return(a)
+}
+
+create_edge_incidence_edges <- function(P, n) {
+  nEdges <- nrow(P)
+  E <- Matrix(
+    data = 0,
+    nrow = nEdges,
+    ncol = n,
+    sparse = TRUE
+  )
+  r <- 1:nEdges
+  col <- P[, 1]
+  E[(col - 1) * nEdges + r] <- 1
+  col <- P[, 2]
+  E[(col - 1) * nEdges + r] <- -1
+  return(E)
+}
+
+fast_gkn_weights <- function(X, k_row, k_col, phi, approx = 0) {
+  p <- ncol(X)
+  n <- nrow(X)
+  
+  all_row_knn <- kNN(X, k_row, sort = FALSE, approx = approx)
+  all_col_knn <- kNN(t(X), k_col, sort = FALSE, approx = approx)
+  
+  # all_row_knn <- FNN::get.knn(X, k_row, algorithm="cover_tree")
+  # all_col_knn <- FNN::get.knn(t(X), k_col, algorithm="cover_tree")
+  unique_row_edges <- data.frame(all_row_knn$id) |>
+    mutate(index = row_number()) |>
+    pivot_longer(!index) |>
+    mutate(
+      neighbor_index = as.integer(str_remove(name, "X")),
+      from_node = pmin(index, value),
+      to_node = pmax(index, value)
+    ) |>
+    distinct(from_node, to_node, .keep_all = TRUE)
+  
+  unique_col_edges <- data.frame(all_col_knn$id) |>
+    mutate(index = row_number()) |>
+    pivot_longer(!index) |>
+    mutate(
+      neighbor_index = as.integer(str_remove(name, "X")),
+      from_node = pmin(index, value),
+      to_node = pmax(index, value)
+    ) |>
+    distinct(from_node, to_node, .keep_all = TRUE)
+  
+  # Need to fix this to only sum over edges used
+  all_row_dist <- all_row_knn$dist[cbind(unique_row_edges$from_node,
+                                         unique_row_edges$neighbor_index)]
+  all_col_dist <- all_col_knn$dist[cbind(unique_col_edges$from_node,
+                                         unique_col_edges$neighbor_index)]
+  
+  row_weights <- exp(-all_row_dist ^ 2 * phi / p)
+  row_weights <- row_weights / sum(row_weights) / sqrt(p)
+  col_weights <- exp(-all_col_dist ^ 2 * phi / n)
+  col_weights <- col_weights / sum(col_weights) / sqrt(n)
+  
+  # Construct edge-incidence matrices
+  E_row <-
+    create_edge_incidence_edges(cbind(unique_row_edges$from_node, unique_row_edges$to_node),
+                                n)
+  E_col <-
+    create_edge_incidence_edges(cbind(unique_col_edges$from_node, unique_col_edges$to_node),
+                                p)
+  
+  return(list(
+    w_row = row_weights,
+    w_col = col_weights,
+    E_row = E_row,
+    E_col = E_col
+  ))
+}
+
+rscobra <- function(X,
+                    lambda,
+                    k_row = 4,
+                    k_col = 4,
+                    nu = 1,
+                    gamma = 10,
+                    phi = 0.05,
+                    tmax = 100,
+                    tol = 1e-9,
+                    recalculate_weights = TRUE,
+                    approx = 0,
+                    threshold = 0,
+                    progress = TRUE) {
+  n = dim(X)[1]
+  p = dim(X)[2]
+  Q <- X
+  q <- runif(p)
+  q <- q / sum(q)
+  
+  cobra_diffs <- rep(NA, tmax)
+  biconvex_diffs <- matrix(NA, nrow = tmax, ncol = tmax)
+  w_path <- matrix(NA, nrow = tmax, ncol = p)
+  
+  pb = txtProgressBar(min = 0,
+                      max = tmax,
+                      initial = 0)
+  for (t in 1:tmax) {
+    # Should recalculation use new weight vector?
+    if (recalculate_weights || t == 1) {
+      # wts = gkn_weights(t(Q), k_row=k_row, k_col=k_col, phi=phi, return_connectivity=FALSE)
+      wts = fast_gkn_weights(
+        t(Q),
+        k_row = k_row,
+        k_col = k_col,
+        phi = phi,
+        approx = approx
+      )
+      w_row <- wts$w_row
+      w_col <- wts$w_col
+      E_row <- wts$E_row
+      E_col <- wts$E_col
+    }
+    
+    # Cobra has rows as features, columns as samples
+    cobra_result <-
+      cobra(t(Q),
+            E_row,
+            E_col,
+            w_row,
+            w_col,
+            gamma = gamma,
+            max_iter = tmax)
+    
+    Q_prime <- t(cobra_result$U[[1]])
+    Q_diff <- sum((Q_prime - Q) ^ 2) / sum(Q_prime ^ 2)
+    cobra_diffs[t] <- Q_diff
+    if (Q_diff < tol) {
+      Q <- Q_prime
+      break
+    }
+    Q <- Q_prime
+    
+    for (t2 in 1:tmax) {
+      # Coordinate wise minima of biconvex optimization
+      # Solve for Q with fixed w
+      w_sq <- q ^ 2 + lambda * q
+      X_weighted <- sweep(X, 2, w_sq / (1 / nu + w_sq), "*")
+      Q_weighted <- sweep(Q, 2, 1 / (1 + nu * w_sq), "*")
+      Q <- Q_weighted + X_weighted
+      
+      # Solve for w with fixed U
+      col_sum_sq = colSums((X - Q) ^ 2)
+      alpha = solve_alpha_prox(col_sum_sq, nu, q, lambda)
+      new_q = (col_sum_sq) / (col_sum_sq + 1 / nu) * pmax((alpha + q / nu) / col_sum_sq - lambda /
+                                                            2, 0)
+      
+      q_diff <- sum((new_q - q) ^ 2)
+      biconvex_diffs[t, t2] <- q_diff
+      if (q_diff < tol) {
+        q = new_q
+        break
+      }
+      q = new_q
+    }
+    w_path[t, ] <- q
+    setTxtProgressBar(pb, t)
+  }
+  close(pb)
+  
+  return(
+    list(
+      U = Q,
+      w = q,
+      lambda = lambda,
+      cobra_diffs = cobra_diffs,
+      biconvex_diffs = biconvex_diffs,
+      w_path = w_path
+    )
+  )
+}
+
+mat_df <- function(bcbc_result,
+                   cluster_w_weights = TRUE,
+                   filter_weight = -Inf) {
+  # filter weight will be as if columns with weight below filter weight did not exist
+  w_prime_idx <- which(bcbc_result$w > filter_weight)
+  w_prime <- bcbc_result$w[w_prime_idx]
+  U_prime <- bcbc_result$U[, w_prime_idx]
+  df <- as.data.frame(U_prime) |>
+    mutate(row_num = row_number()) |>
+    pivot_longer(!row_num, names_to = "col_num") |>
+    mutate(col_num = as.numeric(str_replace(col_num, "V", "")),
+           weight = rep(w_prime, max(row_num)))
+  
+  lambda <- bcbc_result$lambda
+  # TODO should row dist be weighted?
+  if (cluster_w_weights) {
+    w_vals = sqrt(w_prime + lambda * w_prime)
+    solution_mat = sweep(U_prime, 2, w_vals, "*")
+  } else {
+    solution_mat <- U_prime
+  }
+  row_dist <- dist(solution_mat)
+  col_dist <- dist(t(solution_mat))
+  
+  h_row <- hclust(row_dist)
+  h_col <- hclust(col_dist)
+  df <- df |>
+    inner_join(tibble(
+      row_num = h_row$order,
+      order_row = 1:length(h_row$order)
+    )) |>
+    inner_join(tibble(
+      col_num = h_col$order,
+      order_col = 1:length(h_col$order)
+    ))
+  
+  df
+}
+
+centroid_rows <- function(mat, dist_mat, threshold) {
+  to_return = mat
+  row_adjacency <- as.matrix(dist_mat)
+  row_adjacency[which(row_adjacency == 0)] <- 1
+  row_adjacency[which(row_adjacency > threshold)] <- 0
+  
+  # Helps to sort through the communities, don't need names
+  colnames(row_adjacency) <- 1:ncol(row_adjacency)
+  rownames(row_adjacency) <- 1:nrow(row_adjacency)
+  
+  row_clusters <-
+    igraph::components(graph_from_adjacency_matrix(row_adjacency, mode = 'undirected', weighted = TRUE))
+  
+  sorted_membership <- sort(row_clusters$membership)
+  node_indices <- as.integer(names(sorted_membership))
+  curr_index <- 1
+  for (cluster_id in 1:row_clusters$no) {
+    cluster_size <- row_clusters$csize[cluster_id]
+    cluster_members <-
+      node_indices[curr_index:(curr_index + cluster_size - 1)]
+    if (cluster_size > 1) {
+      centroid <- colSums(mat[cluster_members,]) / cluster_size
+      to_return[cluster_members,] <-
+        rep(centroid, each = cluster_size)
+    }
+    
+    curr_index <- curr_index + cluster_size
+  }
+  
+  return(list(mat = to_return, cluster_info = row_clusters))
+}
+
+thresholded_solution <- function(bcbc_result,
+                                 percent_of_noise,
+                                 cluster_w_weights = TRUE) {
+  to_return = list()
+  w <- bcbc_result$w
+  U <- bcbc_result$U
+  lambda <- bcbc_result$lambda
+  if (cluster_w_weights) {
+    w_vals = sqrt(w + lambda * w)
+    solution_mat = sweep(U, 2, w_vals, "*")
+  } else {
+    solution_mat <- U
+  }
+  row_sd <- sd(sqrt(rowSums(solution_mat ^ 2)))
+  threshold <- row_sd * percent_of_noise
+  clustering <- centroid_rows(U, dist(solution_mat), threshold)
+  bcbc_result$U <- clustering$mat
+  bcbc_result$cluster_info <- clustering$cluster_info
+  
+  to_return$w <- w
+  to_return$lambda <- lambda
+  to_return$cluster_info <- clustering$cluster_info
+  to_return$U <- clustering$mat
+  
+  return(to_return)
+}
+
+get_num_row_clusters <- function(mat, threshold) {
+  clustering <- centroid_rows(mat, dist(mat), threshold)
+  return(clustering$cluster_info$no)
+}
+
+plot_matrix <-
+  function(from_mat_df,
+           fill_attr = "value",
+           alpha_weight = FALSE,
+           bin_scale = FALSE) {
+    if (alpha_weight) {
+      raster <-
+        geom_raster(aes(fill = .data[[fill_attr]], alpha = weight))
+    } else {
+      raster <- geom_raster(aes(fill = .data[[fill_attr]]))
+    }
+    
+    if (!bin_scale) {
+      plot_scale = scale_fill_gradient2()
+    } else {
+      plot_scale = scale_fill_steps2(n.breaks = bin_scale)
+    }
+    
+    ggplot(from_mat_df, aes(x = order_col, y = order_row)) +
+      raster +
+      plot_scale +
+      theme_minimal() +
+      theme(axis.text.x = element_blank(),
+            axis.ticks.x = element_blank())
+  }
+
+get_cv_metrics <- function(X,
+                           bcbc_run,
+                           weighted_clusters = TRUE,
+                           percent_noise = 0.25) {
+  U <- bcbc_run$U
+  w <- bcbc_run$w
+  lambda <- bcbc_run$lambda
+  n <- nrow(X)
+  p <- ncol(X)
+  swept <- sweep(U, 2, w ^ 2 + lambda * w, "*")
+  rss <- sum(sweep(X - U, 2, w ^ 2 + lambda * w, "*") ^ 2)
+  rss_no_lambda_sq <- sum(sweep(X - U, 2, w ^ 2, "*") ^ 2)
+  if (weighted_clusters) {
+    row_sd <- sd(sqrt(rowSums(swept ^ 2)))
+    col_sd <- sd(sqrt(colSums(swept ^ 2)))
+    solution_mat <- swept
+  } else {
+    row_sd <- sd(sqrt(rowSums(U ^ 2)))
+    col_sd <- sd(sqrt(colSums(U ^ 2)))
+    solution_mat <- U
+  }
+  num_row_clusters <-
+    get_num_row_clusters(solution_mat, row_sd * percent_noise)
+  num_col_clusters <-
+    get_num_row_clusters(t(solution_mat), col_sd * percent_noise)
+  
+  sparsity_kurtosis <- sum(w ^ 2) ^ 2 / sum(w ^ 4)
+  sparsity_non_zero_w <- sum(w > 1e-10)
+  sparsity_non_zero_sol <- sum(abs(swept) > 1e-10)
+  return(
+    list(
+      num_row_clusters = num_row_clusters,
+      num_col_clusters = num_col_clusters,
+      sparsity_kurtosis = sparsity_kurtosis,
+      sparsity_non_zero_w = sparsity_non_zero_w,
+      sparsity_non_zero_sol = sparsity_non_zero_sol,
+      rss = rss,
+      rss_no_lambda_sq = rss_no_lambda_sq,
+      eBIC = n * p * log(rss_no_lambda_sq / n * p) +
+        2 * log(n * p) * (num_row_clusters * num_col_clusters +
+                            sparsity_non_zero_w)
+    )
+  )
+}
+
+tune_rscobra <- function(X,
+                         lambdas = c(1),
+                         k_rows = c(2),
+                         k_cols = c(2),
+                         nus = c(1),
+                         gammas = c(1),
+                         tmaxs = c(100),
+                         phis = c(0.5),
+                         recalculate_weights = c(TRUE),
+                         tols = c(1e-6),
+                         weighted_clusters = TRUE,
+                         percent_noise = c(0.1)) {
+  all_params <-
+    expand.grid(
+      lambda = lambdas,
+      k_row = k_rows,
+      k_col = k_cols,
+      nu = nus,
+      gamma = gammas,
+      tmax = tmaxs,
+      phi = phis,
+      recalculate_weights = recalculate_weights,
+      tol = tols
+    )
+  
+  cv_data <- data.frame(all_params)
+  
+  all_runs <- list()
+  for (param_set in 1:nrow(all_params)) {
+    params <- all_params[param_set,]
+    result <- rscobra(
+      X,
+      lambda = params$lambda,
+      k_row = params$k_row,
+      k_col = params$k_col,
+      nu = params$nu,
+      gamma = params$gamma,
+      tmax = params$tmax,
+      phi = params$phi,
+      recalculate_weights = params$recalculate_weights,
+      tol = params$tol
+    )
+    cv_metrics <- get_cv_metrics(X,
+                                 result,
+                                 weighted_clusters = weighted_clusters,
+                                 percent_noise = percent_noise)
+    
+    cv_data[param_set, names(cv_metrics)] <- cv_metrics
+    all_runs[[param_set]] <- result
+  }
+  return(list(all_runs = all_runs, cv_data = cv_data))
+}
+
+melt_cv_data <- function(tuning_data) {
+  # Makes a big df mostly for visualization
+  num_runs <- nrow(tuning_data$cv_data)
+  to_return <-
+    cbind(mat_df(tuning_data$all_runs[[1]]), tuning_data$cv_data[1, ])
+  for (i in 2:num_runs) {
+    to_return <- rbind(to_return,
+                       cbind(mat_df(tuning_data$all_runs[[i]]), tuning_data$cv_data[i, ]))
+  }
+  return(to_return)
+}
+
+gen_checkerboard <- function(n,
+                             p,
+                             num_row_clusters,
+                             num_col_clusters,
+                             p_extra = 0,
+                             noise = 1,
+                             shuffle = TRUE) {
+  row_partition <- sort(sample(1:num_row_clusters, n, replace = TRUE))
+  col_partition <-
+    sort(sample(1:num_col_clusters, p, replace = TRUE))
+  mu_kr <- matrix(
+    runif(num_row_clusters * num_col_clusters,-2, 2),
+    nrow = num_row_clusters,
+    ncol = num_col_clusters
+  )
+  
+  data_mat <- matrix(NA, nrow = n, ncol = (p + p_extra))
+  centers <- matrix(NA, nrow = n, ncol = (p + p_extra))
+  for (i in 1:n) {
+    for (j in 1:p) {
+      data_mat[i, j] <-
+        rnorm(1, mean = mu_kr[row_partition[i], col_partition[j]],
+              sd = noise)
+      centers[i, j] <- mu_kr[row_partition[i], col_partition[j]]
+    }
+  }
+  if (p_extra > 0) {
+    data_mat[, (p + 1):(p + p_extra)] <-
+      rnorm(n * p_extra, mean = 0, sd = noise)
+    centers[, (p + 1):(p + p_extra)] <- 0
+  }
+  
+  if (shuffle) {
+    col_reorder <- sample(p + p_extra)
+    row_reorder <- sample(n)
+    shuffled_col <- data_mat[, sample(p + p_extra)]
+    shuffled_center <- centers[, sample(p + p_extra)]
+    shuffled_row <- shuffled_col[sample(n),]
+    shuffled_center <- centers[sample(n),]
+    return(list(X = scale(shuffled_row), centers = shuffled_center))
+  }
+  return(list(X = scale(data_mat), centers = centers))
+}
