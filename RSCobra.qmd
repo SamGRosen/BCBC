@@ -4,7 +4,7 @@ source("./RSCobra.R")
 ```
 
 ```{r}
-X2 = read.csv('lung500.csv', head = FALSE)
+X2 = read.csv('data/lung500.csv', head = FALSE)
 X2 = scale(data.matrix(X2))
 
 ```
@@ -82,7 +82,7 @@ plot_matrix(mat_df(best_checker_dense_run, filter_weight=0))
 
 
 ```{r}
-X2 = read.csv('lung100.csv', head = FALSE)
+X2 = read.csv('data/lung100.csv', head = FALSE)
 X2 = scale(data.matrix(X2))
 
 cv_100 <- tune_rscobra(X2, k_cols=c(3, 5), k_rows=c(3, 5),
@@ -98,7 +98,7 @@ plot_matrix(mat_df(best_lung100_run, filter_weight=0))
 
 
 ```{r}
-X3 = read.csv('lung500.csv', head = FALSE)
+X3 = read.csv('data/lung500.csv', head = FALSE)
 X3 = scale(data.matrix(X3))
 
 cv_500 <- tune_rscobra(X3, lambdas=c(0.001, 0.01, 0.1), nus=c(0.001, 0.01, 0.1), gammas=c(10, 100, 1000))
@@ -112,7 +112,7 @@ plot_matrix(mat_df(best_lung500_run, filter_weight=0), bin_scale=10)
 
 
 ```{r}
-lym <- t(read.csv("./lymphoma.x.txt", header=FALSE, sep=" "))
+lym <- t(read.csv("./data/lymphoma.x.txt", header=FALSE, sep=" "))
 lym <- scale(lym)
 
 
@@ -150,7 +150,7 @@ plot_matrix(
 ```
 
 ```{r}
-srbct <- t(read.csv("./srbct.x.txt", header=FALSE, sep=" "))
+srbct <- t(read.csv("./data/srbct.x.txt", header=FALSE, sep=" "))
 srbct <- scale(srbct)
 
 
