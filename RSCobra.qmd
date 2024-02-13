@@ -10,16 +10,32 @@ X2 = scale(data.matrix(X2))
 ```
 
 ```{r}
-l=rscobra(
+set.seed(1)
+l = rscobra(
   X2,
   lambda = 0.001,
   k_col = 5,
   nu = 0.5,
   gamma = 1000,
-  tmax = 200,
+  tmax = 100,
   phi = 0.5,
   recalculate_weights = TRUE,
-  tol = 1e-6
+  tol = 1e-7,
+  adaptive_nu = FALSE
+)
+
+set.seed(1)
+l2 = rscobra(
+  X2,
+  lambda = 0.001,
+  k_col = 5,
+  nu = 0.5,
+  gamma = 1000,
+  tmax = 100,
+  phi = 0.5,
+  recalculate_weights = TRUE,
+  tol = 1e-7,
+  adaptive_nu = TRUE
 )
 ```
 
@@ -69,7 +85,10 @@ plot_matrix(mat_df(best_checker_dense_run, filter_weight=0))
 X2 = read.csv('lung100.csv', head = FALSE)
 X2 = scale(data.matrix(X2))
 
-cv_100 <- tune_rscobra(X2, lambdas=c(0.001, 0.01, 0.1), nus=c(0.001, 0.01, 0.1), gammas=c(10, 100, 1000))
+cv_100 <- tune_rscobra(X2, k_cols=c(3, 5), k_rows=c(3, 5),
+                       nus=c(0.1),
+                       lambdas=c(0.001, 0.01, 0.1),
+                       gammas=c(10, 100, 1000), tols = c(1e-6))
 
 best_lung100_index <- which(cv_100$cv_data$eBIC == min(cv_100$cv_data$eBIC))
 best_lung100_run <- cv_100$all_runs[[best_lung100_index]]
@@ -135,15 +154,16 @@ srbct <- t(read.csv("./srbct.x.txt", header=FALSE, sep=" "))
 srbct <- scale(srbct)
 
 
-cv_srbct <- tune_rscobra(srbct, lambdas=c(0.001, 0.01, 0.1), nus=c(0.001, 0.01, 0.1), gammas=c(10, 100, 1000))
+cv_srbct <- tune_rscobra(srbct, lambdas=c(0.001, 0.01, 0.1), nus=c(0.1), gammas=c(10, 100, 1000), parallel=TRUE,
+                         recalculate_weights = FALSE, k_cols = c(12), k_rows=c(4))
 
 best_srbct_index <- which(cv_srbct$cv_data$eBIC == min(cv_srbct$cv_data$eBIC))
 best_srbct_run <- cv_srbct$all_runs[[best_srbct_index]]
 plot(sort(best_srbct_run$w))
-plot_matrix(mat_df(best_srbct_run, filter_weight=1/4026))
+plot_matrix(mat_df(best_srbct_run, filter_weight=1/2000))
 
 plot_matrix(
-  mat_df(best_srbct_run, filter_weight = 1/4000) |>
+  mat_df(best_srbct_run, filter_weight = 1/2000) |>
     mutate(value =
              case_when(value < -2 ~ -2,
                        value > 2 ~ 2,
@@ -153,7 +173,7 @@ plot_matrix(
 )
 
 plot_matrix(
-  mat_df(best_srbct_run, filter_weight = 1/4000) |>
+  mat_df(best_srbct_run, filter_weight = 1/2000) |>
     mutate(value = value / sd(value)),
   bin_scale = 10
 )

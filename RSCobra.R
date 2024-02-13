@@ -59,16 +59,18 @@ fast_gkn_weights <- function(X, k_row, k_col, phi, approx = 0) {
     ) |>
     distinct(from_node, to_node, .keep_all = TRUE)
   
-  all_row_dist <- all_row_knn$dist[cbind(unique_row_edges$from_node,
-                                         unique_row_edges$neighbor_index)]
-  all_col_dist <- all_col_knn$dist[cbind(unique_col_edges$from_node,
-                                         unique_col_edges$neighbor_index)]
+  all_row_dist_sq <- all_row_knn$dist[cbind(unique_row_edges$from_node,
+                                         unique_row_edges$neighbor_index)]^2
+  all_col_dist_sq <- all_col_knn$dist[cbind(unique_col_edges$from_node,
+                                         unique_col_edges$neighbor_index)]^2
   
-  row_weights <- exp(-all_row_dist ^ 2 * phi / p)
+  row_weights <- exp(-all_row_dist_sq * phi / p)
   row_weights <- row_weights / sum(row_weights) / sqrt(p)
-  col_weights <- exp(-all_col_dist ^ 2 * phi / n)
+  row_fusion <- sum(row_weights * all_row_dist_sq)
+  col_weights <- exp(-all_col_dist_sq * phi / n)
   col_weights <- col_weights / sum(col_weights) / sqrt(n)
-  
+  col_fusion <- sum(col_weights * all_col_dist_sq)
+
   # Construct edge-incidence matrices
   E_row <-
     create_edge_incidence_edges(cbind(unique_row_edges$from_node, unique_row_edges$to_node),
@@ -81,7 +83,9 @@ fast_gkn_weights <- function(X, k_row, k_col, phi, approx = 0) {
     w_row = row_weights,
     w_col = col_weights,
     E_row = E_row,
-    E_col = E_col
+    E_col = E_col,
+    row_fusion = row_fusion,
+    col_fusion = col_fusion
   ))
 }
 
@@ -92,11 +96,15 @@ rscobra <- function(X,
                     nu = 1,
                     gamma = 10,
                     phi = 0.05,
-                    tmax = 100,
-                    tol = 1e-9,
+                    tmax = NA,  # Set this to set all 3 below
+                    tmax_cobra = 100,
+                    tmax_biconvex = 100,
+                    tmax_outer = 100,
+                    tol = 1e-6,
                     recalculate_weights = TRUE,
                     approx = 0,
                     threshold = 0,
+                    adaptive_nu = FALSE,  # Experimental, may not be helpful
                     progress = TRUE) {
   n <- dim(X)[1]
   p <- dim(X)[2]
@@ -104,16 +112,30 @@ rscobra <- function(X,
   q <- runif(p)
   q <- q / sum(q)
   
-  cobra_diffs <- rep(NA, tmax)
-  biconvex_diffs <- matrix(NA, nrow = tmax, ncol = tmax)
-  w_path <- matrix(NA, nrow = tmax, ncol = p)
+  if(!is.na(tmax)) {
+    tmax_cobra <- tmax
+    tmax_biconvex <- tmax
+    tmax_outer <- tmax
+  }
   
+  if(adaptive_nu) {
+    adaptive_steps <- accumulate(1:tmax_outer, function(x, unused) {1/2 + sqrt(1 + 4 * x^2)/2})
+  }
+
+  cobra_diffs <- rep(NA, tmax_outer)
+  biconvex_diffs <- matrix(NA, nrow = tmax_outer, ncol = tmax_biconvex)
+  w_path <- matrix(NA, nrow = tmax_outer, ncol = p)
+  objective_vals <- rep(NA, tmax_outer)
+  rss_vals <- rep(NA, tmax_outer)
+
   if(progress) {
     pb <- txtProgressBar(min = 0,
-                        max = tmax,
-                        initial = 0)
+                         max = tmax_outer,
+                         initial = 0)
   }
-  for (t in 1:tmax) {
+
+  start <- Sys.time()
+  for (t in 1:tmax_outer) {
     if (recalculate_weights || t == 1) {
       # wts = gkn_weights(t(Q), k_row=k_row, k_col=k_col, phi=phi, return_connectivity=FALSE)
       wts <- fast_gkn_weights(
@@ -127,8 +149,13 @@ rscobra <- function(X,
       w_col <- wts$w_col
       E_row <- wts$E_row
       E_col <- wts$E_col
+      row_fusion <- wts$row_fusion
+      col_fusion <- wts$col_fusion
     }
-    
+
+    rss_vals[t] <- sum(sweep(X - Q, 2, q ^ 2 + lambda * q, "*") ^ 2)
+    objective_vals[t] <- gamma * (row_fusion + col_fusion) + rss_vals[t] / 2
+
     # Cobra has rows as features, columns as samples
     cobra_result <-
       cobra(t(Q),
@@ -137,7 +164,7 @@ rscobra <- function(X,
             w_row,
             w_col,
             gamma = gamma,
-            max_iter = tmax)
+            max_iter = tmax_cobra)
     
     Q_prime <- t(cobra_result$U[[1]])
     Q_diff <- sum((Q_prime - Q) ^ 2) / sum(Q_prime ^ 2)
@@ -146,9 +173,10 @@ rscobra <- function(X,
       Q <- Q_prime
       break
     }
+    old_Q <- Q
     Q <- Q_prime
-    
-    for (t2 in 1:tmax) {
+
+    for (t2 in 1:tmax_biconvex) {
       # Coordinate wise minima of biconvex optimization
       # Solve for Q with fixed w
       w_sq <- q ^ 2 + lambda * q
@@ -171,11 +199,17 @@ rscobra <- function(X,
       q <- new_q
     }
     w_path[t, ] <- q
-    
+
+    if(adaptive_nu) {
+      Q <- Q + (adaptive_steps[t] - 1) / adaptive_steps[t + 1] * (Q - old_Q)
+    }
+
     if(progress) {
       setTxtProgressBar(pb, t)
     }
   }
+
+  end <- Sys.time()
 
   if(progress) {
     close(pb)
@@ -188,7 +222,10 @@ rscobra <- function(X,
       lambda = lambda,
       cobra_diffs = cobra_diffs,
       biconvex_diffs = biconvex_diffs,
-      w_path = w_path
+      w_path = w_path,
+      objective = objective_vals,
+      rss = rss_vals,
+      time = as.numeric(end - start)
     )
   )
 }
@@ -373,7 +410,10 @@ tune_rscobra <- function(X,
                          k_cols = c(2),
                          nus = c(1),
                          gammas = c(1),
-                         tmaxs = c(100),
+                         tmaxs = c(NA),
+                         tmax_outers = c(100),
+                         tmax_cobras = c(100),
+                         tmax_biconvexs = c(100),
                          phis = c(0.5),
                          recalculate_weights = c(TRUE),
                          tols = c(1e-6),
@@ -388,6 +428,9 @@ tune_rscobra <- function(X,
       nu = nus,
       gamma = gammas,
       tmax = tmaxs,
+      tmax_outer = tmax_outers,
+      tmax_cobra = tmax_cobras,
+      tmax_biconvex = tmax_biconvexs,
       phi = phis,
       recalculate_weights = recalculate_weights,
       tol = tols
@@ -409,19 +452,9 @@ tune_rscobra <- function(X,
     future.seed = TRUE,
     function(param_set) {
       params <- all_params[param_set,]
-      result <- rscobra(
-        X,
-        lambda = params$lambda,
-        k_row = params$k_row,
-        k_col = params$k_col,
-        nu = params$nu,
-        gamma = params$gamma,
-        tmax = params$tmax,
-        phi = params$phi,
-        recalculate_weights = params$recalculate_weights,
-        tol = params$tol,
-        progress = !parallel
-      )
+      result <- do.call(rscobra,
+                        c(list(X=X, progress=!parallel), params))
+
       cv_metrics <- get_cv_metrics(X,
                                    result,
                                    weighted_clusters = weighted_clusters,
