@@ -419,7 +419,7 @@ tune_rscobra <- function(X,
                          tols = c(1e-6),
                          weighted_clusters = TRUE,
                          percent_noise = c(0.1),
-                         parallel=FALSE) {
+                         progress=FALSE) {
   all_params <-
     expand.grid(
       lambda = lambdas,
@@ -441,19 +441,13 @@ tune_rscobra <- function(X,
 
   all_runs <- list()
 
-  if(parallel) {
-    plan(multisession)
-  } else {
-    plan(sequential)
-  }
-
   future_results <- future_lapply(
     1:nrow(all_params),
     future.seed = TRUE,
     function(param_set) {
       params <- all_params[param_set,]
       result <- do.call(rscobra,
-                        c(list(X=X, progress=!parallel), params))
+                        c(list(X=X, progress=progress), params))
 
       cv_metrics <- get_cv_metrics(X,
                                    result,
