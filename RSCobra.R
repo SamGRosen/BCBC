@@ -269,25 +269,21 @@ mat_df <- function(bcbc_result,
   df
 }
 
-centroid_rows <- function(mat, dist_mat, threshold) {
-  to_return <- mat
-  row_adjacency <- as.matrix(dist_mat)
-  row_adjacency[which(row_adjacency == 0)] <- 1
-  row_adjacency[which(row_adjacency > threshold)] <- 0
-  
-  # Helps to sort through the communities, don't need names
-  colnames(row_adjacency) <- 1:ncol(row_adjacency)
-  rownames(row_adjacency) <- 1:nrow(row_adjacency)
-  
-  row_clusters <- igraph::components(graph_from_adjacency_matrix(row_adjacency,
-                                                                 mode = 'undirected',
-                                                                 weighted = TRUE))
-  
-  sorted_membership <- sort(row_clusters$membership)
+centroid_rows <- function(mat, mat_for_dist, threshold, calculate_centroids=TRUE) {
+  to_return <- matrix(NA, nrow=nrow(mat), ncol=ncol(mat))
+  row_clusters <- dbscan::comps(frNN(mat_for_dist, threshold, sort=F))
+  names(row_clusters) <- 1:nrow(mat)
+  sorted_membership <- sort(row_clusters)
   node_indices <- as.integer(names(sorted_membership))
+  cluster_sizes <- table(row_clusters)
   curr_index <- 1
-  for (cluster_id in 1:row_clusters$no) {
-    cluster_size <- row_clusters$csize[cluster_id]
+
+  if(!calculate_centroids) {
+    return(list(mat = to_return, cluster_info = row_clusters))
+  }
+
+  for (cluster_id in names(cluster_sizes)) {
+    cluster_size <- cluster_sizes[cluster_id]
     cluster_members <-
       node_indices[curr_index:(curr_index + cluster_size - 1)]
     if (cluster_size > 1) {
@@ -295,10 +291,10 @@ centroid_rows <- function(mat, dist_mat, threshold) {
       to_return[cluster_members,] <-
         rep(centroid, each = cluster_size)
     }
-    
+
     curr_index <- curr_index + cluster_size
   }
-  
+
   return(list(mat = to_return, cluster_info = row_clusters))
 }
 
@@ -317,7 +313,7 @@ thresholded_solution <- function(bcbc_result,
   }
   row_sd <- sd(sqrt(rowSums(solution_mat ^ 2)))
   threshold <- row_sd * percent_of_noise
-  clustering <- centroid_rows(U, dist(solution_mat), threshold)
+  clustering <- centroid_rows(U, solution_mat, threshold)
   bcbc_result$U <- clustering$mat
   bcbc_result$cluster_info <- clustering$cluster_info
   
@@ -330,8 +326,8 @@ thresholded_solution <- function(bcbc_result,
 }
 
 get_num_row_clusters <- function(mat, threshold) {
-  clustering <- centroid_rows(mat, dist(mat), threshold)
-  return(clustering$cluster_info$no)
+  clustering <- centroid_rows(mat, mat, threshold, calculate_centroids = TRUE)
+  return(length(unique(clustering$cluster_info)))
 }
 
 plot_matrix <- function(from_mat_df,
@@ -443,7 +439,6 @@ tune_rscobra <- function(X,
 
   future_results <- future_lapply(
     1:nrow(all_params),
-    future.seed = TRUE,
     function(param_set) {
       params <- all_params[param_set,]
       result <- do.call(rscobra,
