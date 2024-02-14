@@ -1,7 +1,6 @@
 library(cvxbiclustr)
 library(tidyverse)
 library(dbscan)
-library(FNN)
 library(future.apply)
 
 solve_alpha_prox = function(D_l, nu, q, lambda) {
@@ -325,9 +324,10 @@ thresholded_solution <- function(bcbc_result,
   return(to_return)
 }
 
-get_num_row_clusters <- function(mat, threshold) {
-  clustering <- centroid_rows(mat, mat, threshold, calculate_centroids = TRUE)
-  return(length(unique(clustering$cluster_info)))
+get_row_clusters <- function(mat, threshold) {
+  clustering <- centroid_rows(mat, mat, threshold, calculate_centroids = FALSE)
+  
+  return(clustering$cluster_info)
 }
 
 plot_matrix <- function(from_mat_df,
@@ -340,13 +340,13 @@ plot_matrix <- function(from_mat_df,
   } else {
     raster <- geom_raster(aes(fill = .data[[fill_attr]]))
   }
-  
+
   if (!bin_scale) {
     plot_scale = scale_fill_gradient2()
   } else {
     plot_scale = scale_fill_steps2(n.breaks = bin_scale)
   }
-  
+
   ggplot(from_mat_df, aes(x = order_col, y = order_row)) +
     raster +
     plot_scale +
@@ -376,16 +376,18 @@ get_cv_metrics <- function(X,
     col_sd <- sd(sqrt(colSums(U ^ 2)))
     solution_mat <- U
   }
-  num_row_clusters <-
-    get_num_row_clusters(solution_mat, row_sd * percent_noise)
-  num_col_clusters <-
-    get_num_row_clusters(t(solution_mat), col_sd * percent_noise)
+  
+  row_clusters <- get_row_clusters(solution_mat, row_sd * percent_noise)
+  col_clusters <- get_row_clusters(t(solution_mat), col_sd * percent_noise)
+  
+  num_row_clusters <- length(unique(row_clusters))
+  num_col_clusters <- length(unique(col_clusters))
   
   sparsity_kurtosis <- sum(w ^ 2) ^ 2 / sum(w ^ 4)
   sparsity_non_zero_w <- sum(w > 1e-10)
   sparsity_non_zero_sol <- sum(abs(swept) > 1e-10)
-  return(
-    list(
+  return(list(
+    cv_metrics = list(
       num_row_clusters = num_row_clusters,
       num_col_clusters = num_col_clusters,
       sparsity_kurtosis = sparsity_kurtosis,
@@ -393,11 +395,19 @@ get_cv_metrics <- function(X,
       sparsity_non_zero_sol = sparsity_non_zero_sol,
       rss = rss,
       rss_no_lambda_sq = rss_no_lambda_sq,
-      eBIC = n * p * log(rss_no_lambda_sq / n * p) +
+      BIC = n * p * log(rss_no_lambda_sq / n * p) +
+        1 * log(n * p) * (num_row_clusters * num_col_clusters +
+                            sparsity_non_zero_w),
+      eBIC1 = n * p * log(rss_no_lambda_sq / n * p) +
         2 * log(n * p) * (num_row_clusters * num_col_clusters +
+                            sparsity_non_zero_w),
+      eBIC2 = n * p * log(rss_no_lambda_sq / n * p) +
+        3 * log(n * p) * (num_row_clusters * num_col_clusters +
                             sparsity_non_zero_w)
-    )
-  )
+    ),
+    row_clusters = row_clusters,
+    col_clusters = col_clusters
+  ))
 }
 
 tune_rscobra <- function(X,
@@ -436,9 +446,12 @@ tune_rscobra <- function(X,
     mutate(index=row_number())
 
   all_runs <- list()
+  row_clusters <- list()
+  col_clusters <- list()
 
   future_results <- future_lapply(
     1:nrow(all_params),
+    future.seed = TRUE,
     function(param_set) {
       params <- all_params[param_set,]
       result <- do.call(rscobra,
@@ -449,16 +462,24 @@ tune_rscobra <- function(X,
                                    weighted_clusters = weighted_clusters,
                                    percent_noise = percent_noise)
 
-      list(result = result, cv_metrics = cv_metrics)
+      list(
+        result = result,
+        cv_metrics = cv_metrics$cv_metrics,
+        row_clusters = cv_metrics$row_clusters,
+        col_clusters = cv_metrics$col_clusters
+      )
     })
 
   for(param_set in 1:nrow(all_params)) {
     all_runs[[param_set]] = future_results[[param_set]]$result
     cv_metrics <- future_results[[param_set]]$cv_metrics
     cv_data[param_set, names(cv_metrics)] <- cv_metrics
+    row_clusters[[param_set]] = future_results[[param_set]]$row_clusters
+    col_clusters[[param_set]] = future_results[[param_set]]$col_clusters
   }
 
-  return(list(all_runs = all_runs, cv_data = cv_data))
+  return(list(all_runs = all_runs, cv_data = cv_data,
+              row_clusters = row_clusters, col_clusters = col_clusters))
 }
 
 melt_cv_data <- function(tuning_data) {
