@@ -22,12 +22,15 @@ run_sparsebc <- function(X, name) {
                          kr$bestK,
                          kr$bestR,
                          gammas)
-  print(paste("Tuning time:", Sys.time() - tuning_start))
+  print(paste(
+    "Tuning time:",
+    as.numeric(Sys.time() - tuning_start, units = "secs")
+  ))
   
   fit_start <- Sys.time()
   sparsebc_fit <- sparseBC(lung500, kr$bestK,
                            kr$bestR, lambda$lambda)
-  print(paste("Fit time:", Sys.time() - fit_start))
+  print(paste("Fit time:", as.numeric(Sys.time() - fit_start, units = "secs")))
   print(warnings())
   
   saveRDS(sparsebc_fit, paste0("./sparsebc_", name, ".RDS"))

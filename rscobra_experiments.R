@@ -14,7 +14,7 @@ run_rscobra <- function(X, name) {
   cv_start <- Sys.time()
   cv_results <- tune_rscobra(
     X,
-    lambdas = 2 ^ seq(-14, -6, 1),
+    lambdas = 2 ^ seq(-14,-6, 1),
     nus = c(0.15),
     gammas = 2 ^ seq(3, 14, 1),
     recalculate_weights = c(TRUE),
@@ -23,7 +23,11 @@ run_rscobra <- function(X, name) {
     percent_noise = 0.25
   )
   
-  print(paste("CV time:", Sys.time() - cv_start))
+  print(paste(
+    "CV time:",
+    as.numeric(Sys.time() - cv_start, units = "secs"),
+    "seconds"
+  ))
   print(warnings())
   
   saveRDS(cv_results, paste0("./rscobra_", name, ".RDS"))
@@ -35,27 +39,32 @@ lung500 = scale(data.matrix(lung500))
 run_rscobra(lung500, "lung500")
 
 
-lym <- t(read.csv("./data/lymphoma.x.txt", header = FALSE, sep = " "))
+lym <-
+  t(read.csv("./data/lymphoma.x.txt", header = FALSE, sep = " "))
 lym <- scale(lym)
 run_rscobra(lym, "lym")
 
 
-srbct <- t(read.csv("./data/srbct.x.txt", header = FALSE, sep = " "))
+srbct <-
+  t(read.csv("./data/srbct.x.txt", header = FALSE, sep = " "))
 srbct <- scale(srbct)
 run_rscobra(srbct, "srbct")
 
 
-brain <- t(read.csv("./data/brain.x.txt", header = FALSE, sep = " "))
+brain <-
+  t(read.csv("./data/brain.x.txt", header = FALSE, sep = " "))
 brain <- scale(brain)
 run_rscobra(brain, "brain")
 
 
-colon <- t(read.csv("./data/colon.x.txt", header = FALSE, sep = " "))
+colon <-
+  t(read.csv("./data/colon.x.txt", header = FALSE, sep = " "))
 colon <- scale(colon)
 run_rscobra(colon, "colon")
 
 
-leuk <- t(read.csv("./data/leukemia.x.txt", header = FALSE, sep = " "))
+leuk <-
+  t(read.csv("./data/leukemia.x.txt", header = FALSE, sep = " "))
 leuk <- scale(leuk)
 run_rscobra(leuk, "leuk")
 
