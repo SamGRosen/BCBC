@@ -367,7 +367,7 @@ get_cv_metrics <- function(X,
   swept <- sweep(U, 2, w ^ 2 + lambda * w, "*")
   rss <- sum(sweep(X - U, 2, w ^ 2 + lambda * w, "*") ^ 2)
   rss_no_lambda_sq <- sum(sweep(X - U, 2, w ^ 2, "*") ^ 2)
-  if (weighted_clusters) {
+  if (weighted_clusters) {  # TODO make sd calculate only using nonzero features
     row_sd <- sd(sqrt(rowSums(swept ^ 2)))
     col_sd <- sd(sqrt(colSums(swept ^ 2)))
     solution_mat <- swept
@@ -524,16 +524,21 @@ gen_checkerboard <- function(n,
     data_mat[, (p + 1):(p + p_extra)] <-
       rnorm(n * p_extra, mean = 0, sd = noise)
     centers[, (p + 1):(p + p_extra)] <- 0
+    col_partition <- c(col_partition, rep(num_col_clusters + 1, p_extra))
   }
   
   if (shuffle) {
     col_reorder <- sample(p + p_extra)
     row_reorder <- sample(n)
-    shuffled_col <- data_mat[, sample(p + p_extra)]
-    shuffled_center <- centers[, sample(p + p_extra)]
-    shuffled_row <- shuffled_col[sample(n),]
-    shuffled_center <- centers[sample(n),]
-    return(list(X = scale(shuffled_row), centers = shuffled_center))
+    shuffled_col <- data_mat[, col_reorder]
+    shuffled_center <- centers[, col_reorder]
+    shuffled_row <- shuffled_col[row_reorder,]
+    shuffled_center <- centers[row_reorder,]
+    row_partition <- row_partition[row_reorder]
+    col_partition <- col_partition[col_reorder]
+    return(list(X = scale(shuffled_row), centers = shuffled_center, 
+                row_partition=row_partition, col_partition=col_partition))
   }
-  return(list(X = scale(data_mat), centers = centers))
+  return(list(X = scale(data_mat), centers = centers,
+              row_partition=row_partition, col_partition=col_partition))
 }
