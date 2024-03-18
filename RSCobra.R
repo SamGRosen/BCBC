@@ -166,7 +166,7 @@ rscobra <- function(X,
             max_iter = tmax_cobra)
     
     Q_prime <- t(cobra_result$U[[1]])
-    Q_diff <- sum((Q_prime - Q) ^ 2) / sum(Q_prime ^ 2)
+    Q_diff <- sum(abs(Q_prime - Q)) / sum(abs(Q_prime))
     cobra_diffs[t] <- Q_diff
     if (Q_diff < tol) {
       Q <- Q_prime
@@ -410,22 +410,24 @@ get_cv_metrics <- function(X,
   ))
 }
 
-tune_rscobra <- function(X,
-                         lambdas = c(1),
-                         k_rows = c(2),
-                         k_cols = c(2),
-                         nus = c(1),
-                         gammas = c(1),
-                         tmaxs = c(NA),
-                         tmax_outers = c(100),
-                         tmax_cobras = c(100),
-                         tmax_biconvexs = c(100),
-                         phis = c(0.5),
-                         recalculate_weights = c(TRUE),
-                         tols = c(1e-6),
-                         weighted_clusters = TRUE,
-                         percent_noise = c(0.1),
-                         progress=FALSE) {
+tune_bcbc <- function(X,
+                      model = rscobra,
+                      lambdas = c(1),
+                      k_rows = c(2),
+                      k_cols = c(2),
+                      nus = c(1),
+                      gammas = c(1),
+                      tmaxs = c(NA),
+                      tmax_outers = c(100),
+                      tmax_cobras = c(100),
+                      tmax_biconvexs = c(100),
+                      phis = c(0.5),
+                      recalculate_weights = c(TRUE),
+                      tols = c(1e-6),
+                      weighted_clusters = TRUE,
+                      percent_noise = c(0.1),
+                      progress = FALSE) {
+  
   all_params <-
     expand.grid(
       lambda = lambdas,
@@ -536,4 +538,133 @@ gen_checkerboard <- function(n,
     return(list(X = scale(shuffled_row), centers = shuffled_center))
   }
   return(list(X = scale(data_mat), centers = centers))
+}
+
+# From https://github.com/kharchenkolab/vrnmf/tree/main
+projection_onto_simplex <- function(unproj, bound=1) {
+  q <- sort(unproj, decreasing = TRUE, method = "quick")
+  qcum <- cumsum(q)
+  mu <- (qcum - bound) / 1:length(qcum)
+  cond1 <- (mu[-length(mu)] - q[-1]) > 0
+  if (max(cond1) == 0) {
+    ind <- length(mu)
+  } else{
+    ind <- which.max(cond1)
+  }
+  return(pmax(0, unproj - mu[ind]))
+}
+
+palm <- function(X,
+                 lambda,
+                 k_row = 4,
+                 k_col = 4,
+                 nu = 1,
+                 gamma = 10,
+                 phi = 0.05,
+                 tmax = NA, # Set this to set both below
+                 tmax_cobra = 100,
+                 tmax_bicobra = NA, # Unused, here for compatibility with rscobra
+                 tmax_outer = 100,
+                 tol = 1e-6,
+                 recalculate_weights = TRUE,
+                 approx = 0,
+                 threshold = 0,
+                 progress = TRUE) {
+  n <- dim(X)[1]
+  p <- dim(X)[2]
+  U <- X
+  w <- runif(p)
+  w <- w / sum(w)
+  
+  if (!is.na(tmax)) {
+    tmax_cobra <- tmax
+    tmax_outer <- tmax
+  }
+  
+  cobra_diffs <- rep(NA, tmax_outer)
+  w_diffs <- rep(NA, nrow = tmax_outer)
+  w_path <- matrix(NA, nrow = tmax_outer, ncol = p)
+  objective_vals <- rep(NA, tmax_outer)
+  rss_vals <- rep(NA, tmax_outer)
+  
+  if (progress) {
+    pb <- txtProgressBar(min = 0,
+                         max = tmax_outer,
+                         initial = 0)
+  }
+  
+  start <- Sys.time()
+  for (t in 1:tmax_outer) {
+    U_step = U - nu * sweep(X - U, 2, w ^ 2 + lambda * w, "*")
+    if (recalculate_weights || t == 1) {
+      wts <- fast_gkn_weights(
+        t(U_step),
+        k_row = k_row,
+        k_col = k_col,
+        phi = phi,
+        approx = approx
+      )
+      w_row <- wts$w_row
+      w_col <- wts$w_col
+      E_row <- wts$E_row
+      E_col <- wts$E_col
+      row_fusion <- wts$row_fusion
+      col_fusion <- wts$col_fusion
+    }
+    
+    rss_vals[t] <- sum(sweep(X - U, 2, w ^ 2 + lambda * w, "*") ^ 2)
+    objective_vals[t] <-
+      gamma * (row_fusion + col_fusion) + rss_vals[t] / 2
+    
+    # Cobra has rows as features, columns as samples
+    cobra_result <-
+      cobra(t(U_step),
+            E_row,
+            E_col,
+            w_row,
+            w_col,
+            gamma = gamma,
+            max_iter = tmax_cobra)
+    
+    U_prime <- t(cobra_result$U[[1]])
+    U_diff <- sum(abs(U_prime - U)) / sum(abs(U_prime))
+    cobra_diffs[t] <- U_diff
+    if (U_diff < tol) {
+      U <- U_prime
+      break
+    }
+    U <- U_prime
+    
+    col_sum_sq <- colSums((X - U) ^ 2)
+    w_prime <-
+      projection_onto_simplex(w - nu * (w + lambda / 2) * col_sum_sq)
+    
+    w_diff <- sum((w_prime - w) ^ 2)
+    w_diffs[t] <- w_diff
+    w <- w_prime
+    w_path[t, ] <- w
+    if (progress) {
+      setTxtProgressBar(pb, t)
+    }
+  }
+
+  end <- Sys.time()
+  
+  if (progress) {
+    close(pb)
+  }
+  
+  return(
+    list(
+      U = U,
+      w = w,
+      lambda = lambda,
+      cobra_diffs = cobra_diffs,
+      w_diffs = w_diffs,
+      w_path = w_path,
+      objective = objective_vals,
+      rss = rss_vals,
+      time = as.numeric(end - start)
+    )
+  )
 }
