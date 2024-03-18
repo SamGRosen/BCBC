@@ -38,7 +38,6 @@ run_palm <- function(X, name) {
 lung500 = read.csv('data/lung500.csv', head = FALSE)
 lung500 = scale(data.matrix(lung500))
 run_palm(lung500, "lung500")
-stop("good")
 
 lym <-
   t(read.csv("./data/lymphoma.x.txt", header = FALSE, sep = " "))
