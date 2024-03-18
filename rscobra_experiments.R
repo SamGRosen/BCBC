@@ -21,7 +21,8 @@ run_rscobra <- function(X, name) {
     recalculate_weights = c(TRUE),
     k_cols = c(10),
     k_rows = c(4),
-    percent_noise = 0.25
+    percent_noise = 0.25,
+    tols=c(1e-5)
   )
   
   print(paste(

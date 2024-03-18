@@ -21,6 +21,7 @@ run_palm <- function(X, name) {
     recalculate_weights = c(TRUE),
     k_cols = c(10),
     k_rows = c(4),
+    tols=c(1e-5),
     percent_noise = 0.25
   )
   

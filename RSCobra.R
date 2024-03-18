@@ -163,7 +163,8 @@ rscobra <- function(X,
             w_row,
             w_col,
             gamma = gamma,
-            max_iter = tmax_cobra)
+            max_iter = tmax_cobra,
+            tol=tol)
     
     Q_prime <- t(cobra_result$U[[1]])
     Q_diff <- sum(abs(Q_prime - Q)) / sum(abs(Q_prime))
@@ -456,7 +457,7 @@ tune_bcbc <- function(X,
     future.seed = TRUE,
     function(param_set) {
       params <- all_params[param_set,]
-      result <- do.call(rscobra,
+      result <- do.call(model,
                         c(list(X=X, progress=progress), params))
 
       cv_metrics <- get_cv_metrics(X,
@@ -568,7 +569,7 @@ palm <- function(X,
                  phi = 0.05,
                  tmax = NA, # Set this to set both below
                  tmax_cobra = 100,
-                 tmax_bicobra = NA, # Unused, here for compatibility with rscobra
+                 tmax_biconvex = NA, # Unused, here for compatibility with rscobra
                  tmax_outer = 100,
                  tol = 1e-6,
                  recalculate_weights = TRUE,
@@ -629,7 +630,8 @@ palm <- function(X,
             w_row,
             w_col,
             gamma = gamma,
-            max_iter = tmax_cobra)
+            max_iter = tmax_cobra,
+            tol=tol)
     
     U_prime <- t(cobra_result$U[[1]])
     U_diff <- sum(abs(U_prime - U)) / sum(abs(U_prime))
