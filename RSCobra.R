@@ -579,8 +579,7 @@ palm <- function(X,
   n <- dim(X)[1]
   p <- dim(X)[2]
   U <- X
-  w <- runif(p)
-  w <- w / sum(w)
+  w <- rep(1/p, p)
   
   if (!is.na(tmax)) {
     tmax_cobra <- tmax

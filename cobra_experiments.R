@@ -3,7 +3,7 @@ install.packages("dbscan")
 
 source("./RSCobra.R")
 
-gammas <- 2 ^ seq(3, 20, 1)
+gammas <- 2 ^ seq(5, 16, 0.25)
 
 run_cobra <- function(X, name) {
   print(paste(name, "dim", dim(X)))
@@ -11,7 +11,7 @@ run_cobra <- function(X, name) {
   weight_start <- Sys.time()
   wts <- fast_gkn_weights(
     t(X),
-    k_row = 4,
+    k_row = 2,
     k_col = 10,
     phi = 0.5,
     approx = 0
