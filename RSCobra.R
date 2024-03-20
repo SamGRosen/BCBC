@@ -600,7 +600,8 @@ palm <- function(X,
   
   start <- Sys.time()
   for (t in 1:tmax_outer) {
-    U_step = U - nu * sweep(X - U, 2, w ^ 2 + lambda * w, "*")
+    nu_U = nu
+    U_step = U - nu_U * sweep(X - U, 2, w ^ 2 + lambda * w, "*")
     if (recalculate_weights || t == 1) {
       wts <- fast_gkn_weights(
         t(U_step),
@@ -642,8 +643,11 @@ palm <- function(X,
     U <- U_prime
     
     col_sum_sq <- colSums((X - U) ^ 2)
+    lipschitz_fixed_U = sqrt(sum(col_sum_sq ^ 2))
+    nu_w = 1/(1.1 * lipschitz_fixed_U)
+    
     w_prime <-
-      projection_onto_simplex(w - nu * (w + lambda / 2) * col_sum_sq)
+      projection_onto_simplex(w - nu_w * (w + lambda / 2) * col_sum_sq)
     
     w_diff <- sum((w_prime - w) ^ 2)
     w_diffs[t] <- w_diff
