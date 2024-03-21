@@ -1,8 +1,7 @@
 library(cvxbiclustr)
 library(tidyverse)
+library(dbscan)
 library(future.apply)
-library(rnndescent)
-
 
 solve_alpha_prox = function(D_l, nu, q, lambda) {
   D_nu <- D_l / (1 / nu + D_l)
@@ -30,22 +29,15 @@ create_edge_incidence_edges <- function(P, n) {
   return(E)
 }
 
-fast_gkn_weights <- function(X, k_row, k_col, phi, prev_row_nn=NULL, prev_col_nn=NULL) {
+fast_gkn_weights <- function(X, k_row, k_col, phi, approx = 0) {
   p <- ncol(X)
   n <- nrow(X)
   
-  if(TRUE) {
-    all_row_knn <- brute_force_knn(X, k_row + 1, obs = "R")
-  } else {
-    all_row_knn <- nnd_knn(X, k_row + 1, obs = "R", init = prev_row_nn)
-  }
+  all_row_knn <- hnsw_knn(X, k_row + 1, byrow=FALSE)
+  all_col_knn <- hnsw_knn(X, k_col + 1, byrow=FALSE)
   
-  if(TRUE) {
-    all_col_knn <- brute_force_knn(X, k_col + 1, obs = "C")
-  } else {
-    all_col_knn <- nnd_knn(X, k_row + 1, obs = "C", init = prev_col_nn)
-  }
-
+  # all_row_knn <- FNN::get.knn(X, k_row, algorithm="cover_tree")
+  # all_col_knn <- FNN::get.knn(t(X), k_col, algorithm="cover_tree")
   unique_row_edges <- data.frame(all_row_knn$idx) |>
     mutate(index = row_number()) |>
     pivot_longer(!index) |>
@@ -69,9 +61,9 @@ fast_gkn_weights <- function(X, k_row, k_col, phi, prev_row_nn=NULL, prev_col_nn
     distinct(from_node, to_node, .keep_all = TRUE)
   
   all_row_dist_sq <- all_row_knn$dist[cbind(unique_row_edges$from_node,
-                                         unique_row_edges$neighbor_index)]^2
+                                            unique_row_edges$neighbor_index)]^2
   all_col_dist_sq <- all_col_knn$dist[cbind(unique_col_edges$from_node,
-                                         unique_col_edges$neighbor_index)]^2
+                                            unique_col_edges$neighbor_index)]^2
   
   row_weights <- exp(-all_row_dist_sq * phi / p)
   row_weights <- row_weights / sum(row_weights) / sqrt(p)
@@ -79,7 +71,7 @@ fast_gkn_weights <- function(X, k_row, k_col, phi, prev_row_nn=NULL, prev_col_nn
   col_weights <- exp(-all_col_dist_sq * phi / n)
   col_weights <- col_weights / sum(col_weights) / sqrt(n)
   col_fusion <- sum(col_weights * all_col_dist_sq)
-
+  
   # Construct edge-incidence matrices
   E_row <-
     create_edge_incidence_edges(cbind(unique_row_edges$from_node, unique_row_edges$to_node),
@@ -94,9 +86,7 @@ fast_gkn_weights <- function(X, k_row, k_col, phi, prev_row_nn=NULL, prev_col_nn
     E_row = E_row,
     E_col = E_col,
     row_fusion = row_fusion,
-    col_fusion = col_fusion,
-    row_nn_graph = all_row_knn,
-    col_nn_graph = all_col_knn
+    col_fusion = col_fusion
   ))
 }
 
@@ -132,19 +122,19 @@ rscobra <- function(X,
   if(adaptive_nu) {
     adaptive_steps <- accumulate(1:tmax_outer, function(x, unused) {1/2 + sqrt(1 + 4 * x^2)/2})
   }
-
+  
   cobra_diffs <- rep(NA, tmax_outer)
   biconvex_diffs <- matrix(NA, nrow = tmax_outer, ncol = tmax_biconvex)
   w_path <- matrix(NA, nrow = tmax_outer, ncol = p)
   objective_vals <- rep(NA, tmax_outer)
   rss_vals <- rep(NA, tmax_outer)
-
+  
   if(progress) {
     pb <- txtProgressBar(min = 0,
                          max = tmax_outer,
                          initial = 0)
   }
-
+  
   start <- Sys.time()
   for (t in 1:tmax_outer) {
     if (recalculate_weights || t == 1) {
@@ -163,10 +153,10 @@ rscobra <- function(X,
       row_fusion <- wts$row_fusion
       col_fusion <- wts$col_fusion
     }
-
+    
     rss_vals[t] <- sum(sweep(X - Q, 2, q ^ 2 + lambda * q, "*") ^ 2)
     objective_vals[t] <- gamma * (row_fusion + col_fusion) + rss_vals[t] / 2
-
+    
     # Cobra has rows as features, columns as samples
     cobra_result <-
       cobra(t(Q),
@@ -187,7 +177,7 @@ rscobra <- function(X,
     }
     old_Q <- Q
     Q <- Q_prime
-
+    
     for (t2 in 1:tmax_biconvex) {
       # Coordinate wise minima of biconvex optimization
       # Solve for Q with fixed w
@@ -200,7 +190,7 @@ rscobra <- function(X,
       col_sum_sq <- colSums((X - Q) ^ 2)
       alpha <- solve_alpha_prox(col_sum_sq, nu, q, lambda)
       new_q <- (col_sum_sq) / (col_sum_sq + 1 / nu) * pmax((alpha + q / nu) / col_sum_sq - lambda /
-                                                            2, 0)
+                                                             2, 0)
       
       q_diff <- sum((new_q - q) ^ 2)
       biconvex_diffs[t, t2] <- q_diff
@@ -211,22 +201,22 @@ rscobra <- function(X,
       q <- new_q
     }
     w_path[t, ] <- q
-
+    
     if(adaptive_nu) {
       Q <- Q + (adaptive_steps[t] - 1) / adaptive_steps[t + 1] * (Q - old_Q)
     }
-
+    
     if(progress) {
       setTxtProgressBar(pb, t)
     }
   }
-
+  
   end <- Sys.time()
-
+  
   if(progress) {
     close(pb)
   }
-
+  
   return(
     list(
       U = Q,
@@ -289,11 +279,11 @@ centroid_rows <- function(mat, mat_for_dist, threshold, calculate_centroids=TRUE
   node_indices <- as.integer(names(sorted_membership))
   cluster_sizes <- table(row_clusters)
   curr_index <- 1
-
+  
   if(!calculate_centroids) {
     return(list(mat = to_return, cluster_info = row_clusters))
   }
-
+  
   for (cluster_id in names(cluster_sizes)) {
     cluster_size <- cluster_sizes[cluster_id]
     cluster_members <-
@@ -303,10 +293,10 @@ centroid_rows <- function(mat, mat_for_dist, threshold, calculate_centroids=TRUE
       to_return[cluster_members,] <-
         rep(centroid, each = cluster_size)
     }
-
+    
     curr_index <- curr_index + cluster_size
   }
-
+  
   return(list(mat = to_return, cluster_info = row_clusters))
 }
 
@@ -353,13 +343,13 @@ plot_matrix <- function(from_mat_df,
   } else {
     raster <- geom_raster(aes(fill = .data[[fill_attr]]))
   }
-
+  
   if (!bin_scale) {
     plot_scale = scale_fill_gradient2()
   } else {
     plot_scale = scale_fill_steps2(n.breaks = bin_scale)
   }
-
+  
   ggplot(from_mat_df, aes(x = order_col, y = order_row)) +
     raster +
     plot_scale +
@@ -456,14 +446,14 @@ tune_bcbc <- function(X,
       recalculate_weights = recalculate_weights,
       tol = tols
     )
-
+  
   cv_data <- data.frame(all_params) |>
     mutate(index=row_number())
-
+  
   all_runs <- list()
   row_clusters <- list()
   col_clusters <- list()
-
+  
   future_results <- future_lapply(
     1:nrow(all_params),
     future.seed = TRUE,
@@ -471,12 +461,12 @@ tune_bcbc <- function(X,
       params <- all_params[param_set,]
       result <- do.call(model,
                         c(list(X=X, progress=progress), params))
-
+      
       cv_metrics <- get_cv_metrics(X,
                                    result,
                                    weighted_clusters = weighted_clusters,
                                    percent_noise = percent_noise)
-
+      
       list(
         result = result,
         cv_metrics = cv_metrics$cv_metrics,
@@ -484,7 +474,7 @@ tune_bcbc <- function(X,
         col_clusters = cv_metrics$col_clusters
       )
     })
-
+  
   for(param_set in 1:nrow(all_params)) {
     all_runs[[param_set]] = future_results[[param_set]]$result
     cv_metrics <- future_results[[param_set]]$cv_metrics
@@ -492,7 +482,7 @@ tune_bcbc <- function(X,
     row_clusters[[param_set]] = future_results[[param_set]]$row_clusters
     col_clusters[[param_set]] = future_results[[param_set]]$col_clusters
   }
-
+  
   return(list(all_runs = all_runs, cv_data = cv_data,
               row_clusters = row_clusters, col_clusters = col_clusters))
 }
@@ -611,8 +601,6 @@ palm <- function(X,
   }
   
   start <- Sys.time()
-  prev_row_nn = NULL
-  prev_col_nn = NULL
   for (t in 1:tmax_outer) {
     nu_U = nu
     U_step = U - nu_U * sweep(X - U, 2, w ^ 2 + lambda * w, "*")
@@ -622,8 +610,7 @@ palm <- function(X,
         k_row = k_row,
         k_col = k_col,
         phi = phi,
-        prev_row_nn = prev_row_nn,
-        prev_col_nn = prev_col_nn
+        approx = approx
       )
       w_row <- wts$w_row
       w_col <- wts$w_col
@@ -631,9 +618,6 @@ palm <- function(X,
       E_col <- wts$E_col
       row_fusion <- wts$row_fusion
       col_fusion <- wts$col_fusion
-      
-      prev_row_nn = wts$row_nn_graph
-      prev_col_nn = wts$col_nn_graph
     }
     
     rss_vals[t] <- sum(sweep(X - U, 2, w ^ 2 + lambda * w, "*") ^ 2)
@@ -675,7 +659,7 @@ palm <- function(X,
       setTxtProgressBar(pb, t)
     }
   }
-
+  
   end <- Sys.time()
   
   if (progress) {
