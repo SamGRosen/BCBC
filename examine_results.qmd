@@ -1,0 +1,111 @@
+```{r}
+source("./RSCobra.R")
+```
+
+```{r}
+datasets <- c(brain="brain", colon="colon", leuk="leukemia", srbct="srbct", lym="lymphoma")
+```
+
+```{r}
+metrics <- c("vi", "nmi", "split.join", "rand", "adjusted.rand")
+
+augment_cv <- function(rs_cobra, y_vals, columns=FALSE) {
+  for (metric in metrics) {
+    all_metric <- sapply(1:nrow(rs_cobra$cv_data), function(i) {
+      if(columns) {
+        clusters <- rs_cobra$col_clusters[[i]]
+      } else {
+        clusters <- rs_cobra$row_clusters[[i]]
+      }
+      if (length(unique(clusters)) == length(clusters)) {
+        return(-1)
+      }
+      igraph::compare(clusters, y_vals, method =
+                        metric)
+    })
+    rs_cobra$cv_data[[paste0(metric, "_", columns)]] <- all_metric
+  }
+  return(rs_cobra)
+}
+
+augment_cobra <- function(cobra, y_vals) {
+  num_trials <- length(cobra$validation_error)
+  for (metric in metrics) {
+    all_metric <-
+      sapply(1:num_trials, function(i) {
+        if (length(unique(cobra$groups_col[[i]]$cluster)) == length(cobra$groups_col[[i]]$cluster)) {
+          return(-1)
+        }
+        igraph::compare(cobra$groups_col[[i]]$cluster, y_vals, method =
+                          metric)
+      })
+    cobra[[metric]] <- all_metric
+  }
+  return(cobra)
+}
+```
+
+```{r}
+brain_y <- read.csv("./data/brain.y.txt", header=FALSE)
+rscobra_brain <- readRDS("./cv_brain.RDS")
+augmented_brain <- augment_cv(rscobra_brain, brain_y$V1)
+```
+
+```{r}
+colon_y <- read.csv("./data/colon.y.txt", header=FALSE)
+# rscobra_colon <- readRDS("./cv_colon.RDS")
+cobra_colon <- readRDS("./cobra_2colon.RDS")
+# augmented_colon <- augment_cv(rscobra_colon, colon_y$V1)
+augmented_colon_cobra <- augment_cobra(cobra_colon, colon_y$V1)
+```
+
+```{r}
+leuk_y <- read.csv("./data/leukemia.y.txt", header=FALSE)
+# rscobra_leuk <- readRDS("./cv_leuk.RDS")
+# augmented_leuk <- augment_cv(rscobra_leuk, leuk_y$V1)
+```
+
+```{r}
+cobra_leuk <- readRDS("./cobra_leuk.RDS")
+augmented_leuk_cobra <- augment_cobra(cobra_leuk, leuk_y$V1)
+cobra_leuk2 <- readRDS("./cobra_2leuk.RDS")
+augmented_leuk_cobra2 <- augment_cobra(cobra_leuk2, leuk_y$V1)
+
+```
+
+```{r}
+palm_leuk <- readRDS("./palm_leuk2.RDS")
+augmented_leuk_palm <- augment_cv(palm_leuk, leuk_y$V1)
+# plot(sort(augmented_leuk_palm$all_runs[[29]]$w))
+```
+
+```{r}
+lym_y <- read.csv("./data/lymphoma.y.txt", header=FALSE)
+cobra_lym <- readRDS("./cobra_2lym.RDS")
+augmented_lym <- augment_cobra(cobra_lym, lym_y$V1)
+```
+
+```{r}
+palm_lym <- readRDS("./palm_lym.RDS")
+augmented_lym_palm <- augment_cv(palm_lym, lym_y$V1)
+```
+
+```{r}
+palm_lym2 <- readRDS("./palm_lym_tuned.RDS")
+augmented_lym_palm2 <- augment_cv(palm_lym2, lym_y$V1)
+```
+
+```{r}
+srbct_y <- read.csv("./data/srbct.y.txt", header=FALSE)
+rscobra_srbct <- readRDS("./rscobra_srbct.RDS")
+augmented_srbct <- augment_cv(rscobra_srbct, srbct_y$V1)
+
+cobra_srbct <- readRDS("./cobra_srbct.RDS")
+cobra_augmented_srbct <- augment_cobra(cobra_srbct, srbct_y$V1)
+```
+
+```{r}
+prostate_y <- read.csv("./data/prostate.y.txt", header=FALSE)
+
+
+```

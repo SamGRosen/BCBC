@@ -3,7 +3,7 @@ install.packages("dbscan")
 
 source("./RSCobra.R")
 
-gammas <- 2 ^ seq(5, 16, 0.25)
+gammas <- 2 ^ seq(10, 16, 0.05)
 
 run_cobra <- function(X, name) {
   print(paste(name, "dim", dim(X)))
@@ -11,8 +11,8 @@ run_cobra <- function(X, name) {
   weight_start <- Sys.time()
   wts <- fast_gkn_weights(
     t(X),
-    k_row = 2,
-    k_col = 10,
+    k_row = 10,
+    k_col = 4,
     phi = 0.5,
     approx = 0
   )
@@ -30,7 +30,7 @@ run_cobra <- function(X, name) {
     wts$w_row,
     wts$w_col,
     gamma = gammas,
-    max_iter = 300
+    max_iter = 500
   )
   print(paste(
     "CV time:",
@@ -41,44 +41,44 @@ run_cobra <- function(X, name) {
   
   saveRDS(result, paste0("./cobra_", name, ".RDS"))
 }
+# 
+# 
+# lung500 = read.csv('data/lung500.csv', head = FALSE)
+# lung500 = scale(data.matrix(lung500))
+# run_cobra(lung500, "2lung500")
+# # 
+# 
+# lym <-
+#   t(read.csv("./data/lymphoma.x.txt", header = FALSE, sep = " "))
+# lym <- scale(lym)
+# run_cobra(lym, "2lym")
+# 
+# 
+# srbct <-
+#   t(read.csv("./data/srbct.x.txt", header = FALSE, sep = " "))
+# srbct <- scale(srbct)
+# run_cobra(srbct, "2srbct")
 
 
-lung500 = read.csv('data/lung500.csv', head = FALSE)
-lung500 = scale(data.matrix(lung500))
-run_cobra(lung500, "lung500")
-
-
-lym <-
-  t(read.csv("./data/lymphoma.x.txt", header = FALSE, sep = " "))
-lym <- scale(lym)
-run_cobra(lym, "lym")
-
-
-srbct <-
-  t(read.csv("./data/srbct.x.txt", header = FALSE, sep = " "))
-srbct <- scale(srbct)
-run_cobra(srbct, "srbct")
-
-
-brain <-
-  t(read.csv("./data/brain.x.txt", header = FALSE, sep = " "))
-brain <- scale(brain)
-run_cobra(brain, "brain")
-
-
-colon <-
-  t(read.csv("./data/colon.x.txt", header = FALSE, sep = " "))
-colon <- scale(colon)
-run_cobra(colon, "colon")
+# brain <-
+#   t(read.csv("./data/brain.x.txt", header = FALSE, sep = " "))
+# brain <- scale(brain)
+# run_cobra(brain, "2brain")
+# 
+# 
+# colon <-
+#   t(read.csv("./data/colon.x.txt", header = FALSE, sep = " "))
+# colon <- scale(colon)
+# run_cobra(colon, "2colon")
 
 
 leuk <-
   t(read.csv("./data/leukemia.x.txt", header = FALSE, sep = " "))
 leuk <- scale(leuk)
-run_cobra(leuk, "leuk")
+run_cobra(leuk, "3leuk")
 
-
-prostate <-
-  t(read.csv("./data/prostate.x.txt", header = FALSE, sep = " "))
-prostate <- scale(prostate)
-run_cobra(prostate, "prostate")
+# 
+# prostate <-
+#   t(read.csv("./data/prostate.x.txt", header = FALSE, sep = " "))
+# prostate <- scale(prostate)
+# run_cobra(prostate, "2prostate")

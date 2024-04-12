@@ -177,3 +177,66 @@ plot_matrix(
   bin_scale = 10
 )
 ```
+
+```{r}
+plan(multisession, workers = "8")
+bhatt <- t(read.csv("./data/BhattacherjeeLung2001.txt", header=FALSE, sep="\t"))
+bhatt <- scale(bhatt[-204,])
+
+
+cv_bhatt <- tune_rscobra(bhatt,
+                         lambdas=c(0.0001, 0.001, 0.01), nus=c(0.25),
+                         gammas=c(10, 100, 1000, 10000),
+                         recalculate_weights = FALSE, k_cols = c(20), k_rows=c(4))
+```
+
+```{r}
+brain <- t(read.csv("./data/brain.x.txt", header=FALSE, sep=" "))
+brain <- scale(brain)
+
+cv_brain <- tune_rscobra(brain,
+                         lambdas=2 ^ seq(-14, -6, 1),
+                         nus=c(0.15),
+                         gammas=2 ^ seq(3, 14, 1),
+                         recalculate_weights = c(TRUE),
+                         k_cols = c(10),
+                         k_rows = c(4),
+                         percent_noise = 0.25)
+
+saveRDS(cv_brain, "./cv_brain.RDS")
+
+```
+
+```{r}
+colon <- t(read.csv("./data/colon.x.txt", header=FALSE, sep=" "))
+colon <- scale(colon)
+
+cv_colon <- tune_rscobra(colon,
+                         lambdas=2 ^ seq(-14, -6, 1),
+                         nus=c(0.15),
+                         gammas=2 ^ seq(3, 14, 1),
+                         recalculate_weights = c(TRUE),
+                         k_cols = c(10),
+                         k_rows = c(4),
+                         percent_noise = 0.25)
+
+saveRDS(cv_colon, "./cv_colon.RDS")
+```
+
+
+```{r}
+leuk <- t(read.csv("./data/leukemia.x.txt", header=FALSE, sep=" "))
+leuk <- scale(leuk)
+
+cv_leuk <- tune_rscobra(leuk,
+                        lambdas=2 ^ seq(-14, -6, 1),
+                        nus=c(0.15),
+                        gammas=2 ^ seq(3, 14, 1),
+                        recalculate_weights = c(TRUE),
+                        k_cols = c(10),
+                        k_rows = c(4),
+                        percent_noise = 0.25)
+
+saveRDS(cv_leuk, "./cv_leuk.RDS")
+
+```

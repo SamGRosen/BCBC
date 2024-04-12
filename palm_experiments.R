@@ -1,28 +1,29 @@
-# install.packages("./cvxbiclustr", repos = NULL, type = "source")
-# install.packages("dbscan")
-# install.packages("future.apply")
+install.packages("./cvxbiclustr", repos = NULL, type = "source")
+install.packages("dbscan")
+install.packages("future.apply")
 
 source("./RSCobra.R")
 
-plan(sequential)
-# plan(multisession, workers = 12)
+plan(sequential, split=TRUE)
+# plan(multicore, workers = 4)
 
 
-run_palm <- function(X, name, gammas = 2 ^ seq(3, 14, 1)) {
+run_palm <- function(X, name, gammas = 2 ^ seq(10, 18, 1)) {
   print(paste(name, "dim", dim(X)))
   
   cv_start <- Sys.time()
   cv_results <- tune_bcbc(
     X,
     model=palm,
-    lambdas = 2 ^ seq(-12,-8, 1),
-    nus = c(1),
+    lambdas = 2 ^ seq(-7,-5, 0.25),
+    nus = c(2),
     gammas = gammas,
     recalculate_weights = c(TRUE),
     k_cols = c(10),
     k_rows = c(4),
-    tols=c(1e-5),
-    percent_noise = 0.25
+    tols=c(10^(-4.5)),
+    percent_noise = 0.25,
+    progress = TRUE
   )
   
   print(paste(
@@ -40,35 +41,35 @@ run_palm <- function(X, name, gammas = 2 ^ seq(3, 14, 1)) {
 # lung500 = scale(data.matrix(lung500))
 # run_palm(lung500, "lung500")
 
-lym <-
-  t(read.csv("./data/lymphoma.x.txt", header = FALSE, sep = " "))
-lym <- scale(lym)
-run_palm(lym, "lym_tuned", 2^seq(11, 16, 0.20))
-
-
-srbct <-
-  t(read.csv("./data/srbct.x.txt", header = FALSE, sep = " "))
-srbct <- scale(srbct)
-run_palm(srbct, "srbct_tuned", 2 ^ seq(9, 11, 0.1))
-
+# lym <-
+#   t(read.csv("./data/lymphoma.x.txt", header = FALSE, sep = " "))
+# lym <- scale(lym)
+# run_palm(lym, "lym_static", 2^seq(5, 16, 0.5))
+# 
+# 
+# srbct <-
+#   t(read.csv("./data/srbct.x.txt", header = FALSE, sep = " "))
+# srbct <- scale(srbct)
+# run_palm(srbct, "srbct_static", 2^seq(3, 13, 0.5))
+# 
 # 
 # brain <-
 #   t(read.csv("./data/brain.x.txt", header = FALSE, sep = " "))
 # brain <- scale(brain)
-# run_palm(brain, "brain")
-# 
+# run_palm(brain, "brain_static", 2^seq(3, 13, 0.5))
+
 # 
 # colon <-
 #   t(read.csv("./data/colon.x.txt", header = FALSE, sep = " "))
 # colon <- scale(colon)
 # run_palm(colon, "colon")
 # 
-# 
-# leuk <-
-#   t(read.csv("./data/leukemia.x.txt", header = FALSE, sep = " "))
-# leuk <- scale(leuk)
-# run_palm(leuk, "leuk")
-# 
+
+leuk <-
+  t(read.csv("./data/leukemia.x.txt", header = FALSE, sep = " "))
+leuk <- scale(leuk)
+run_palm(leuk, "leuk2", gammas = 2^seq(13, 16, 0.25))
+
 # 
 # prostate <-
 #   t(read.csv("./data/prostate.x.txt", header = FALSE, sep = " "))

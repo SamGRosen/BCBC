@@ -1,0 +1,201 @@
+```{r}
+source("./RSCobra.R")
+# devtools::install_github("cran/cvxclustr")
+library(cvxclustr)
+library(MASS)
+```
+
+
+```{r}
+
+mat_df2 <- function(matrix) {
+  df <- as.data.frame(matrix) |>
+    mutate(row_num = row_number()) |>
+    pivot_longer(!row_num, names_to = "col_num") |>
+    mutate(col_num = as.numeric(str_replace(col_num, "V", "")))
+
+  row_dist <- dist(matrix)
+  col_dist <- dist(t(matrix))
+  
+  h_row <- hclust(row_dist)
+  h_col <- hclust(col_dist)
+  df <- df |>
+    inner_join(tibble(
+      row_num = h_row$order,
+      order_row = 1:length(h_row$order)
+    )) |>
+    inner_join(tibble(
+      col_num = h_col$order,
+      order_col = 1:length(h_col$order)
+    ))
+
+  df
+}
+
+# checker <- gen_checkerboard(6, 40, 2, 2, noise=1, shuffle = TRUE)
+# 
+ggplot(mat_df(checker$X), aes(x = order_col, y = order_row)) +
+    geom_raster(aes(fill = value)) +
+    scale_fill_gradient2() +
+    theme_minimal() +
+    theme(axis.text.x = element_blank(),
+          axis.ticks.x = element_blank())
+
+# X <- t(checker$X)
+# 
+# w <- kernel_weights(X, 0.5)
+# w <- knn_weights(w, 2, ncol(X))
+# # 
+# gammas <- c(100, 1000, 10000)
+# # 
+# solutions <- cvxclust_path_admm(X, w, gammas, nu=1)
+```
+
+
+```{r}
+
+only_rows <- palm(checker$X, 0, gamma= 1, k_row=2, k_col=2)
+plot_matrix(mat_df(only_rows))
+```
+
+```{r}
+plot_matrix(mat_df(only_rows))
+```
+
+
+
+```{r}
+
+
+per_cluster <- 30
+num_solutions <- 9
+
+set.seed(2)
+X <- rbind(
+  mvrnorm(per_cluster, c(1,1), matrix(c(1, 0.5, 0.5, 1), nrow=2)),
+  mvrnorm(per_cluster, c(-2.25,1), matrix(c(0.75, 0.5, 0.5, 0.75), nrow=2)),
+  mvrnorm(per_cluster, c(0,-1.75), matrix(c(1.5, 0, 0, 0.25), nrow=2))
+)
+
+X <- t(X)
+
+w <- kernel_weights(X, 0.5)
+w <- knn_weights(w, 3, ncol(X))
+
+gammas <- c(0.1, 1, 2, 5, 10, 20, 35, 50, 100)
+
+solutions <- cvxclust_path_admm(X, w, gammas)
+
+to_plot <- tibble(
+  orig_x = numeric(),
+  orig_y = numeric(),
+  new_x = numeric(),
+  new_y = numeric(),
+  gamma = numeric(),
+  index = numeric(),
+  true_cluster = numeric(),
+)
+
+for(i in 1:num_solutions) {
+  to_plot <- rbind(
+    to_plot,
+    tibble(
+      orig_x = X[1,],
+      orig_y = X[2,],
+      new_x = solutions$U[[i]][1,],
+      new_y = solutions$U[[i]][2,],
+      gamma = rep(gammas[i], ncol(X)),
+      index = 1:ncol(X),
+      true_cluster = rep(c(1, 2, 3), times = 1, each = per_cluster),
+    )
+  )
+}
+```
+
+```{r}
+
+custom_labeller <- function(variable, value) {
+  return(paste0("gamma=", value))
+}
+
+ggplot(to_plot) +
+  geom_point(aes(orig_x, orig_y), alpha=0.25) +
+  geom_segment(aes(group=index, x=orig_x, y=orig_y, xend=new_x, yend=new_y), 
+               alpha=0.25, linetype=2) +
+  geom_point(aes(new_x, new_y), color="blue") +
+  facet_wrap(~gamma, labeller=custom_labeller) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.ticks = element_blank()
+  )
+
+```
+
+```{r}
+gammas <- seq(0, 100, 0.25)
+
+num_solutions <- length(gammas)
+solutions <- cvxclust_path_admm(X, w, gammas)
+
+to_plot <- tibble(
+  orig_x = numeric(),
+  orig_y = numeric(),
+  new_x = numeric(),
+  new_y = numeric(),
+  gamma = numeric(),
+  index = numeric(),
+  true_cluster = numeric(),
+)
+
+for(i in 1:num_solutions) {
+  to_plot <- rbind(
+    to_plot,
+    tibble(
+      orig_x = X[1,],
+      orig_y = X[2,],
+      new_x = solutions$U[[i]][1,],
+      new_y = solutions$U[[i]][2,],
+      gamma = rep(gammas[i], ncol(X)),
+      index = 1:ncol(X),
+      true_cluster = rep(c(1, 2, 3), times = 1, each = per_cluster),
+    )
+  )
+}
+
+```
+
+```{r}
+ggplot(to_plot) +
+  geom_point(aes(orig_x, orig_y), alpha=0.15) +
+  geom_path(aes(group=index, x=new_x, y=new_y, color=as.character(true_cluster)), 
+               alpha=0.25, linetype=2) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.ticks = element_blank()
+  ) +
+  guides(color = "none") +
+  ggtitle("Convex clustering solution path for 3 clusters")
+
+```
+
+
+```{r}
+checker <- gen_checkerboard(300, 300, 10, 10, noise=1.5, shuffle = TRUE, prob_empty = 0.5, scale=FALSE)
+
+ggplot(mat_df2(checker$X), aes(x = order_col, y = order_row)) +
+    geom_raster(aes(fill = value)) +
+    scale_fill_gradient2() +
+    theme_minimal() +
+    theme(axis.text.x = element_blank(),
+          axis.ticks.x = element_blank())
+
+from_palm3 <- tune_bcbc(checker$X, model=palm, lambdas=c(0), gammas=2^seq(10, 15, 0.5), recalculate_weights = TRUE, progress = TRUE)
+```

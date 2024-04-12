@@ -1,0 +1,319 @@
+```{r}
+source("./RSCobra.R")
+library(dynamicTreeCut)
+library(sparseBC)
+library(s4vd)
+library(biclust)
+library(SCBiclust)
+
+```
+
+# Helper Functions
+
+```{r}
+matrix_to_df <- function(matrix) {
+  df <- as.data.frame(matrix) |>
+    mutate(row_num = row_number()) |>
+    pivot_longer(!row_num, names_to = "col_num") |>
+    mutate(col_num = as.numeric(str_replace(col_num, "V", "")))
+
+  row_dist <- dist(matrix)
+  col_dist <- dist(t(matrix))
+  
+  h_row <- hclust(row_dist)
+  h_col <- hclust(col_dist)
+  df <- df |>
+    inner_join(tibble(
+      row_num = h_row$order,
+      order_row = 1:length(h_row$order)
+    )) |>
+    inner_join(tibble(
+      col_num = h_col$order,
+      order_col = 1:length(h_col$order)
+    ))
+
+  df
+}
+
+plot_matrix_simple <- function(as_df) {
+  ggplot(as_df, aes(x = order_col, y = order_row)) +
+    geom_raster(aes(fill = value)) +
+    scale_fill_gradient2() +
+    theme_minimal() +
+    theme(axis.text.x = element_blank(),
+          axis.ticks.x = element_blank())
+}
+
+metrics <- c("vi", "nmi", "split.join", "rand", "adjusted.rand")
+
+evaluate_checker <- function(checker, fitted_mat, row_groups, col_groups) {
+  to_return = list()
+  
+  for (metric in metrics) {
+    to_return[[paste(c(metric, "row"), sep = "_")]] <-
+      igraph::compare(row_groups,
+                      checker$row_partition, method = metric)
+    
+    to_return[[paste(c(metric, "col"), sep = "_")]] <-
+      igraph::compare(col_groups,
+                      checker$col_partition, method = metric)
+  }
+  
+  if(is.null(fitted_mat)) {
+    to_return$true_err <- NA
+  } else {
+    to_return$true_err <- mean((checker$centers - fitted_mat)^2)
+  }
+  to_return
+}
+```
+
+# Data
+
+```{r}
+
+all_checkers <- list()
+
+noise_levels <- c(0.5, 1, 1.5, 2)
+extra_dims <- c(0, 100, 250, 500, 1000)
+
+i <- 1
+for(noise_level in noise_levels) {
+  for (extra_dim in extra_dims) {
+    all_checkers[[i]] <- gen_checkerboard(
+      200,
+      200,
+      6,
+      6,
+      noise = noise_level,
+      p_extra = extra_dim,
+      prob_empty = 0.25
+    )
+    all_checkers[[i]]$noise_level = noise_level
+    all_checkers[[i]]$extra_dim = extra_dim
+    
+    i <- i + 1
+  }
+}
+
+```
+
+# BiCobra
+
+```{r}
+
+all_palm_results = list()
+for(checker in length(all_checkers)) {
+  print(checker)
+  all_palm_results[[i]] <-
+    tune_bcbc(
+      all_checkers[[checker]]$X,
+      palm,
+      lambdas = 2 ^ seq(-8,-4, 1),
+      gammas = 2 ^ seq(3, 12, 1)
+    )
+}
+
+```
+
+
+# Cobra
+
+```{r}
+
+all_cobra_results = list()
+for(checker in length(all_checkers)) {
+  wts <- fast_gkn_weights(
+    t(all_checkers[[checker]]$X),
+    k_row = 2,
+    k_col = 2,
+    phi = 0.5,
+    approx = 0
+  )
+  
+  all_cobra_results[[i]] <-
+    cobra_validate(
+      t(X),
+      wts$E_row,
+      wts$E_col,
+      wts$w_row,
+      wts$w_col,
+      gamma = 2 ^ seq(3, 16, 0.25),
+      max_iter = 500
+    )
+}
+
+```
+
+
+# SSVD 
+
+```{r}
+all_ssvd_results = list()
+for(checker in length(all_checkers)) {
+  all_ssvd_results[[i]] <-
+    biclust(
+      all_checkers[[checker]]$X,
+      K = 36,
+      method = s4vd::BCssvd(),
+      niter = 500,
+      gamu = 1,  # has to be 0 or crashes
+      gamv = 1,  # has to be 0 or crashes
+      merr = 1e-4
+    )
+}
+```
+
+# S4VD
+
+```{r}
+
+all_s4vd_results = list()
+for(checker in length(all_checkers)) {
+  all_s4vd_results[[i]] <-
+    biclust(
+      all_checkers[[checker]]$X,
+      method = s4vd::BCs4vd(),
+      row.overlap = FALSE,
+      col.overlap = FALSE,
+      nbiclust = 36,
+      iter = 1000,
+      gamm = 0,  # has to be 0 or crashes
+      merr = 1e-4,
+      ss.thr = c(1, 1)  # needs to be tuned
+    )
+}
+
+```
+
+# SparseBC
+
+```{r}
+
+run_sparsebc <- function(X, gammas) {
+  kr <-
+    sparseBC.choosekr(
+      X,
+      k = 1:10,
+      r = 1:10,
+      lambda = 0,
+      percent = 0.125,
+      TRUE
+    )
+
+  lambda <- sparseBC.BIC(X,
+                         kr$estimated_kr[1, 1],
+                         kr$estimated_kr[1, 2],
+                         gammas)
+  
+  sparsebc_fit <- sparseBC(X,
+                           kr$estimated_kr[1, 1],
+                           kr$estimated_kr[1, 2],
+                           lambda$lambda)
+  sparsebc_fit
+}
+
+all_sparsebc_results = list()
+for(checker in length(all_checkers)) {
+  all_sparsebc_results[[i]] <-
+    run_sparsebc(all_checkers[[checker]]$X, gammas = gammas=2^seq(-2, 10, 1))
+}
+
+```
+
+# SCBiclust
+
+```{r}
+
+all_scbiclust_results = list()
+for(checker in length(all_checkers)) {
+  all_scbiclust_results[[i]] <-
+    PermBiclust.sigclust_stop(all_checkers[[checker]]$X,
+                              sc=FALSE,
+                              maxnum.bicluster = 36)
+}
+```
+
+# SCBiclust
+
+```{r}
+
+all_scbiclust_results2 = list()
+for(checker in length(all_checkers)) {
+  all_scbiclust_results2[[i]] <-
+    PermBiclust.beta.ks(all_checkers[[checker]]$X,
+                        silent = TRUE,
+                        maxnum.bicluster = 36)
+}
+```
+
+# LAS
+
+```{r}
+source("./shabalin.R")
+# requires knowledge of clsuter size
+```
+
+# BCCC
+
+```{r}
+
+all_bccc_results = list()
+
+all_deltas <- 2^seq(-2, 10, 0.5)
+all_alphas <- 2^seq(-2, 2, 0.5)
+
+for(checker in length(all_checkers)) {
+  for(delta in all_deltas) {
+    for(alpha in all_alphas) {
+        temp_result <- biclust(all_checkers[[checker]]$X,
+            method = BCCC(),
+            alpha = alpha,
+            delta = delta,
+            number = 36)
+    }
+  }
+}
+
+```
+
+# BCPlaid, # doesn't seem to work
+
+```{r}
+
+all_bcplaid_results = list()
+for (checker in length(all_checkers)) {
+  all_bcplaid_results[[i]] <-
+    biclust(
+      all_checkers[[checker]]$X,
+      method = BCPlaid(),
+      background = FALSE,
+      max.layers = 36,
+      iter.layer = 20,
+      iter.startup = 20,
+      row.release = 0,
+      col.release = 0,
+      verbose = FALSE
+    )
+}
+
+```
+
+# BCQuest, doesn't seem to work
+
+```{r}
+test9 <- biclust(checker$X,
+                 method=BCQuest()
+                 )
+
+```
+
+# BCSpectral, doesn't seem to work
+
+```{r}
+test10 <- biclust(checker$X,
+                  method=BCSpectral(),
+                  n_clusters = 4
+                  )
+
+```

@@ -15,10 +15,10 @@ run_rscobra <- function(X, name, gammas=2^seq(3, 14, 1)) {
   cv_results <- tune_bcbc(
     X,
     model=rscobra,
-    lambdas = 2 ^ seq(-14,-6, 1),
+    lambdas = 2 ^ seq(-16,-4, 0.5),
     nus = c(0.15),
     gammas = gammas,
-    recalculate_weights = c(TRUE),
+    recalculate_weights = c(FALSE),
     k_cols = c(10),
     k_rows = c(4),
     percent_noise = 0.25,
@@ -44,19 +44,19 @@ run_rscobra <- function(X, name, gammas=2^seq(3, 14, 1)) {
 lym <-
   t(read.csv("./data/lymphoma.x.txt", header = FALSE, sep = " "))
 lym <- scale(lym)
-run_rscobra(lym, "lym_tuned", gammas=2^seq(11, 16, 0.20))
+run_rscobra(lym, "lym_static", gammas=2^seq(4, 16, 0.5))
 
 
 srbct <-
   t(read.csv("./data/srbct.x.txt", header = FALSE, sep = " "))
 srbct <- scale(srbct)
-run_rscobra(srbct, "srbct_tuned", 2 ^ seq(9, 11, 0.1))
+run_rscobra(srbct, "srbct_static", 2 ^ seq(3, 11, 0.5))
 
-# 
-# brain <-
-#   t(read.csv("./data/brain.x.txt", header = FALSE, sep = " "))
-# brain <- scale(brain)
-# run_rscobra(brain, "brain")
+
+brain <-
+  t(read.csv("./data/brain.x.txt", header = FALSE, sep = " "))
+brain <- scale(brain)
+run_rscobra(brain, "brain_static", 2 ^ seq(3, 11, 0.5))
 
 
 # colon <-

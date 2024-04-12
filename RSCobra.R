@@ -29,7 +29,27 @@ create_edge_incidence_edges <- function(P, n) {
   return(E)
 }
 
-fast_gkn_weights <- function(X, k_row, k_col, phi, approx = 0) {
+calc_fusion_term <- function(edges, weights, U, rows=TRUE) {
+  from_node <- edges$from_node
+  to_node <- edges$to_node
+  
+  all_distances <- rep(NA, length(from_node))
+  for(i in seq_along(from_node)) {
+    if(rows) {
+      all_distances[i] = sqrt(sum((U[from_node[i], ] - U[to_node[i], ])^2))
+    } else {
+      all_distances[i] = sqrt(sum((U[, from_node[i]] - U[, to_node[i]])^2))
+    }
+  }
+  return(sum(weights * all_distances))
+}
+
+fast_gkn_weights <- function(X,
+                             k_row,
+                             k_col,
+                             phi,
+                             approx = 0,
+                             return_edges = TRUE) {
   p <- ncol(X)
   n <- nrow(X)
   
@@ -45,7 +65,7 @@ fast_gkn_weights <- function(X, k_row, k_col, phi, approx = 0) {
       neighbor_index = as.integer(str_remove(name, "X")),
       from_node = pmin(index, value),
       to_node = pmax(index, value)
-    ) |>
+    ) |> # TODO: May be worth double counting some edges
     distinct(from_node, to_node, .keep_all = TRUE)
   
   unique_col_edges <- data.frame(all_col_knn$id) |>
@@ -65,10 +85,10 @@ fast_gkn_weights <- function(X, k_row, k_col, phi, approx = 0) {
   
   row_weights <- exp(-all_row_dist_sq * phi / p)
   row_weights <- row_weights / sum(row_weights) / sqrt(p)
-  row_fusion <- sum(row_weights * all_row_dist_sq)
+  row_fusion <- sum(row_weights * sqrt(all_row_dist_sq))
   col_weights <- exp(-all_col_dist_sq * phi / n)
   col_weights <- col_weights / sum(col_weights) / sqrt(n)
-  col_fusion <- sum(col_weights * all_col_dist_sq)
+  col_fusion <- sum(col_weights * sqrt(all_col_dist_sq))
 
   # Construct edge-incidence matrices
   E_row <-
@@ -77,15 +97,21 @@ fast_gkn_weights <- function(X, k_row, k_col, phi, approx = 0) {
   E_col <-
     create_edge_incidence_edges(cbind(unique_col_edges$from_node, unique_col_edges$to_node),
                                 p)
-  
-  return(list(
+  to_return <- list(
     w_row = row_weights,
     w_col = col_weights,
     E_row = E_row,
     E_col = E_col,
     row_fusion = row_fusion,
     col_fusion = col_fusion
-  ))
+  )
+  
+  if(return_edges) {
+    to_return$unique_row_edges = unique_row_edges
+    to_return$unique_col_edges = unique_col_edges
+  }
+
+  return(to_return)
 }
 
 rscobra <- function(X,
@@ -150,6 +176,9 @@ rscobra <- function(X,
       E_col <- wts$E_col
       row_fusion <- wts$row_fusion
       col_fusion <- wts$col_fusion
+    } else {
+      row_fusion <- calc_fusion_term(wts$unique_row_edges, wts$w_row, Q, rows=FALSE)
+      col_fusion <- calc_fusion_term(wts$unique_col_edges, wts$w_col, Q, rows=TRUE)
     }
 
     rss_vals[t] <- sum(sweep(X - Q, 2, q ^ 2 + lambda * q, "*") ^ 2)
@@ -503,16 +532,26 @@ gen_checkerboard <- function(n,
                              num_col_clusters,
                              p_extra = 0,
                              noise = 1,
-                             shuffle = TRUE) {
+                             prob_empty = 0.1,
+                             shuffle = TRUE,
+                             scale = TRUE) {
   row_partition <- sort(sample(1:num_row_clusters, n, replace = TRUE))
   col_partition <-
     sort(sample(1:num_col_clusters, p, replace = TRUE))
+  
   mu_kr <- matrix(
     runif(num_row_clusters * num_col_clusters,-2, 2),
     nrow = num_row_clusters,
     ncol = num_col_clusters
   )
   
+  zeroed <- matrix(
+    rbinom(num_row_clusters * num_col_clusters, 1, 1-prob_empty),
+    nrow = num_row_clusters,
+    ncol = num_col_clusters
+  )
+  mu_kr <- mu_kr * zeroed
+
   data_mat <- matrix(NA, nrow = n, ncol = (p + p_extra))
   centers <- matrix(NA, nrow = n, ncol = (p + p_extra))
   for (i in 1:n) {
@@ -539,11 +578,28 @@ gen_checkerboard <- function(n,
     shuffled_center <- centers[row_reorder,]
     row_partition <- row_partition[row_reorder]
     col_partition <- col_partition[col_reorder]
-    return(list(X = scale(shuffled_row), centers = shuffled_center, 
-                row_partition=row_partition, col_partition=col_partition))
+    if(scale) {
+      shuffled_row <- scale(shuffled_row)
+      shuffled_center <- scale(shuffled_center, 
+                               center=attr(shuffled_row, "scaled:center"),
+                               scale=attr(shuffled_row, "scaled:scale")
+                               )
+    }
+    return(list(X = shuffled_row, centers = shuffled_center, 
+                row_partition=row_partition, col_partition=col_partition,
+                zeroed=zeroed))
   }
-  return(list(X = scale(data_mat), centers = centers,
-              row_partition=row_partition, col_partition=col_partition))
+  if(scale) {
+    data_mat <- scale(data_mat)
+    centers <- scale(
+      centers,
+      center = attr(data_mat, "scaled:center"),
+      scale = attr(data_mat, "scaled:scale")
+    )
+  }
+  return(list(X = data_mat, centers = centers,
+              row_partition=row_partition, col_partition=col_partition,
+              zeroed=zeroed))
 }
 
 # From https://github.com/kharchenkolab/vrnmf/tree/main
@@ -616,6 +672,9 @@ palm <- function(X,
       E_col <- wts$E_col
       row_fusion <- wts$row_fusion
       col_fusion <- wts$col_fusion
+    } else {
+      row_fusion <- calc_fusion_term(wts$unique_row_edges, wts$w_row, U, rows=FALSE)
+      col_fusion <- calc_fusion_term(wts$unique_col_edges, wts$w_col, U, rows=TRUE)
     }
     
     rss_vals[t] <- sum(sweep(X - U, 2, w ^ 2 + lambda * w, "*") ^ 2)
