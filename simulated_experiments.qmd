@@ -50,11 +50,11 @@ evaluate_checker <- function(checker, fitted_mat, row_groups, col_groups) {
   to_return = list()
   
   for (metric in metrics) {
-    to_return[[paste(c(metric, "row"), sep = "_")]] <-
+    to_return[[paste(metric, "row", sep = "_")]] <-
       igraph::compare(row_groups,
                       checker$row_partition, method = metric)
     
-    to_return[[paste(c(metric, "col"), sep = "_")]] <-
+    to_return[[paste(metric, "col", sep = "_")]] <-
       igraph::compare(col_groups,
                       checker$col_partition, method = metric)
   }
@@ -103,16 +103,16 @@ for(noise_level in noise_levels) {
 ```{r}
 
 all_palm_results = list()
-for(checker in length(all_checkers)) {
+for(checker in 1:length(all_checkers)) {
   print(checker)
-  all_palm_results[[i]] <-
+  all_palm_results[[checker]] <-
     tune_bcbc(
       all_checkers[[checker]]$X,
       palm,
       lambdas = 2 ^ seq(-8,-4, 1),
       gammas = 2 ^ seq(3, 12, 1)
     )
-}
+  }
 
 ```
 
@@ -149,18 +149,21 @@ for(checker in length(all_checkers)) {
 # SSVD 
 
 ```{r}
+options(warn=-1)
 all_ssvd_results = list()
-for(checker in length(all_checkers)) {
-  all_ssvd_results[[i]] <-
+for(checker in 1:length(all_checkers)) {
+  print(checker)
+  all_ssvd_results[[checker]] <-
     biclust(
       all_checkers[[checker]]$X,
       K = 36,
       method = s4vd::BCssvd(),
-      niter = 500,
-      gamu = 1,  # has to be 0 or crashes
-      gamv = 1,  # has to be 0 or crashes
+      niter = 100,
+      gamu = 1,
+      gamv = 1,
       merr = 1e-4
     )
+  break
 }
 ```
 
@@ -169,8 +172,8 @@ for(checker in length(all_checkers)) {
 ```{r}
 
 all_s4vd_results = list()
-for(checker in length(all_checkers)) {
-  all_s4vd_results[[i]] <-
+for(checker in 1:length(all_checkers)) {
+  all_s4vd_results[[checker]] <-
     biclust(
       all_checkers[[checker]]$X,
       method = s4vd::BCs4vd(),
@@ -214,8 +217,8 @@ run_sparsebc <- function(X, gammas) {
 }
 
 all_sparsebc_results = list()
-for(checker in length(all_checkers)) {
-  all_sparsebc_results[[i]] <-
+for(checker in 1:length(all_checkers)) {
+  all_sparsebc_results[[checker]] <-
     run_sparsebc(all_checkers[[checker]]$X, gammas = gammas=2^seq(-2, 10, 1))
 }
 
@@ -226,8 +229,8 @@ for(checker in length(all_checkers)) {
 ```{r}
 
 all_scbiclust_results = list()
-for(checker in length(all_checkers)) {
-  all_scbiclust_results[[i]] <-
+for(checker in 1:length(all_checkers)) {
+  all_scbiclust_results[[checker]] <-
     PermBiclust.sigclust_stop(all_checkers[[checker]]$X,
                               sc=FALSE,
                               maxnum.bicluster = 36)
@@ -239,8 +242,8 @@ for(checker in length(all_checkers)) {
 ```{r}
 
 all_scbiclust_results2 = list()
-for(checker in length(all_checkers)) {
-  all_scbiclust_results2[[i]] <-
+for(checker in 1:length(all_checkers)) {
+  all_scbiclust_results2[[checker]] <-
     PermBiclust.beta.ks(all_checkers[[checker]]$X,
                         silent = TRUE,
                         maxnum.bicluster = 36)
@@ -263,7 +266,7 @@ all_bccc_results = list()
 all_deltas <- 2^seq(-2, 10, 0.5)
 all_alphas <- 2^seq(-2, 2, 0.5)
 
-for(checker in length(all_checkers)) {
+for(checker in 1:length(all_checkers)) {
   for(delta in all_deltas) {
     for(alpha in all_alphas) {
         temp_result <- biclust(all_checkers[[checker]]$X,
@@ -282,8 +285,8 @@ for(checker in length(all_checkers)) {
 ```{r}
 
 all_bcplaid_results = list()
-for (checker in length(all_checkers)) {
-  all_bcplaid_results[[i]] <-
+for (checker in 1:length(all_checkers)) {
+  all_bcplaid_results[[checker]] <-
     biclust(
       all_checkers[[checker]]$X,
       method = BCPlaid(),

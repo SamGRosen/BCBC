@@ -5,10 +5,11 @@ library(cvxclustr)
 library(MASS)
 ```
 
+# Helper Functions 
 
 ```{r}
 
-mat_df2 <- function(matrix) {
+mat_df2 <- function(matrix, labels=NULL) {
   df <- as.data.frame(matrix) |>
     mutate(row_num = row_number()) |>
     pivot_longer(!row_num, names_to = "col_num") |>
@@ -29,17 +30,23 @@ mat_df2 <- function(matrix) {
       order_col = 1:length(h_col$order)
     ))
 
+  if (is.null(labels)) {
+    return(df)
+  } else {
+    df <- df |>
+      inner_join(tibble(row_num = 1:length(h_row$order), label = labels))
+  }
   df
 }
 
 # checker <- gen_checkerboard(6, 40, 2, 2, noise=1, shuffle = TRUE)
 # 
-ggplot(mat_df(checker$X), aes(x = order_col, y = order_row)) +
-    geom_raster(aes(fill = value)) +
-    scale_fill_gradient2() +
-    theme_minimal() +
-    theme(axis.text.x = element_blank(),
-          axis.ticks.x = element_blank())
+# ggplot(mat_df(checker$X), aes(x = order_col, y = order_row)) +
+#     geom_raster(aes(fill = value)) +
+#     scale_fill_gradient2() +
+#     theme_minimal() +
+#     theme(axis.text.x = element_blank(),
+#           axis.ticks.x = element_blank())
 
 # X <- t(checker$X)
 # 
@@ -63,6 +70,7 @@ plot_matrix(mat_df(only_rows))
 ```
 
 
+# Convex Clustering Examples
 
 ```{r}
 
@@ -186,6 +194,7 @@ ggplot(to_plot) +
 
 ```
 
+# Biclustering Example
 
 ```{r}
 checker <- gen_checkerboard(300, 300, 10, 10, noise=1.5, shuffle = TRUE, prob_empty = 0.5, scale=FALSE)
@@ -198,4 +207,215 @@ ggplot(mat_df2(checker$X), aes(x = order_col, y = order_row)) +
           axis.ticks.x = element_blank())
 
 from_palm3 <- tune_bcbc(checker$X, model=palm, lambdas=c(0), gammas=2^seq(10, 15, 0.5), recalculate_weights = TRUE, progress = TRUE)
+```
+
+# Clustering Dimension
+
+```{r}
+set.seed(20)
+check <- gen_checkerboard(100, 200, 10, 10, noise=1, p_extra=1000)
+
+all_checks <- list()
+all_checks[[1]] <- cbind(check$X,
+                         (matrix(rnorm(100*100, sd=1), nrow=100)))
+for(i in 2:10) {
+  all_checks[[i]] <- cbind(all_checks[[i-1]],
+                           (matrix(rnorm(100*100, sd=1), nrow=100)))
+}
+
+
+
+
+```
+
+
+
+# Real Data
+
+```{r}
+plot_fit <- function(matrix, labels, title="") {
+  plot_df <- mat_df2(matrix, labels)
+  ggplot(plot_df, aes(x = order_col, y = order_row)) +
+    geom_raster(aes(fill = value)) +
+    annotate(
+      geom = "rect",
+      xmin = -ncol(matrix) / 25,
+      xmax = 0,
+      ymin = plot_df$order_row - 0.5,
+      ymax = plot_df$order_row + 0.5,
+      fill = case_when(
+        plot_df$label == 1 ~ "green",
+        plot_df$label == 2 ~ "yellow",
+        plot_df$label == 3 ~ "purple",
+        plot_df$label == 4 ~ "grey",
+        plot_df$label == 5 ~ "orange",
+        plot_df$label == 6 ~ "blue",
+        plot_df$label == 7 ~ "red",
+        plot_df$label == 8 ~ "magenta",
+        plot_df$label == 9 ~ "pink",
+        TRUE ~ "black"
+      )
+    ) +
+    scale_fill_gradient2() +
+    theme_minimal() +
+    theme(
+      axis.text.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.text.y = element_blank(),
+      axis.ticks.y = element_blank()
+    ) +
+    # guides(fill = "none") +
+    xlab("") +
+    ylab("") +
+    ggtitle(title)
+}
+
+```
+
+## Leuk
+
+```{r}
+# sparsebc_leuk <- readRDS("./sparsebc_leuk.RDS")
+# palm_leuk <- readRDS("./palm_leuk2.RDS")
+# cobra_leuk <- readRDS("./cobra_leuk.RDS")
+
+leuk_y <- read.csv("./data/leukemia.y.txt", header = FALSE)
+leuk <- t(read.csv("./data/leukemia.x.txt", header = FALSE, sep = " "))
+leuk <- scale(leuk)
+```
+
+```{r}
+plot_fit(leuk, leuk_y$V1, "Gene Expression Pattern of Leukemia Samples")
+```
+
+```{r}
+
+igraph::compare(palm_leuk$row_clusters[[100]],
+                leuk_y$V1,
+                method="adjusted.rand")
+
+plot_fit(palm_leuk$all_runs[[100]]$U,
+         leuk_y$V1,
+         "Gene Expression Pattern of Leukemia Samples (PALM)")
+```
+
+```{r}
+
+igraph::compare(sparsebc_leuk$Cs,
+                leuk_y$V1,
+                method="adjusted.rand")
+
+plot_fit(sparsebc_leuk$mus,
+         leuk_y$V1,
+         "Gene Expression Pattern of Leukemia Samples (SparseBC)")
+```
+
+```{r}
+igraph::compare(cobra_leuk$groups_col[[24]]$cluster,
+                leuk_y$V1,
+                method="adjusted.rand")
+
+plot_fit(t(cobra_leuk$U[[24]]),
+         leuk_y$V1,
+         "Gene Expression Pattern of Leukemia Samples (COBRA)")
+```
+
+## Lym
+
+```{r}
+# sparsebc_leuk <- readRDS("./sparsebc_leuk.RDS")
+palm_lym <- readRDS("./palm_lym.RDS")
+# cobra_lym <- readRDS("./cobra_lym.RDS")
+
+lym_y <- read.csv("./data/lymphoma.y.txt", header = FALSE)
+lym <- t(read.csv("./data/lymphoma.x.txt", header = FALSE, sep = " "))
+lym <- scale(lym)
+```
+
+```{r}
+plot_fit(lym, lym_y$V1, "Gene Expression Pattern of Lymphoma Samples")
+
+```
+
+```{r}
+igraph::compare(palm_lym$row_clusters[[82]],
+                lym_y$V1,
+                method="adjusted.rand")
+
+plot_fit(palm_lym$all_runs[[82]]$U,
+         lym_y$V1,
+         "Gene Expression Pattern of Lymphoma Samples (PALM)")
+```
+
+```{r}
+igraph::compare(cobra_lym$row_clusters[[82]],
+                lym_y$V1,
+                method="adjusted.rand")
+
+plot_fit(t(cobra_lym$U[[24]]),
+         lym_y$V1,
+         "Gene Expression Pattern of Lymphoma Samples (COBRA)")
+```
+
+```{r}
+igraph::compare(sparsebc_lym$row_clusters[[82]],
+                lym_y$V1,
+                method="adjusted.rand")
+
+plot_fit(sparsebc_lym$row_clusters[[82]],
+         lym_y$V1,
+         "Gene Expression Pattern of Lymphoma Samples (SparseBC)")
+```
+
+
+## Colon
+
+```{r}
+
+colon_y <- read.csv("./data/colon.y.txt", header = FALSE)
+colon <- t(read.csv("./data/colon.x.txt", header = FALSE, sep = " "))
+colon <- scale(colon)
+```
+
+```{r}
+plot_fit(colon, colon_y$V1, "Gene Expression Pattern of ... Samples")
+```
+
+## Prostate
+
+```{r}
+
+prostate_y <- read.csv("./data/prostate.y.txt", header = FALSE)
+prostate <- t(read.csv("./data/prostate.x.txt", header = FALSE, sep = " "))
+prostate <- scale(prostate)
+```
+
+```{r}
+plot_fit(prostate, prostate_y$V1, "Gene Expression Pattern of ... Samples")
+```
+
+## SRBCT
+
+```{r}
+
+srbct_y <- read.csv("./data/srbct.y.txt", header = FALSE)
+srbct <- t(read.csv("./data/srbct.x.txt", header = FALSE, sep = " "))
+srbct <- scale(srbct)
+```
+
+```{r}
+plot_fit(srbct, srbct_y$V1, "Gene Expression Pattern of ... Samples")
+```
+
+## Brain
+
+```{r}
+
+brain_y <- read.csv("./data/brain.y.txt", header = FALSE)
+brain <- t(read.csv("./data/brain.x.txt", header = FALSE, sep = " "))
+brain <- scale(brain)
+```
+
+```{r}
+plot_fit(brain, brain_y$V1, "Gene Expression Pattern of ... Samples")
 ```

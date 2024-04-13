@@ -66,10 +66,12 @@ leuk_y <- read.csv("./data/leukemia.y.txt", header=FALSE)
 ```
 
 ```{r}
-cobra_leuk <- readRDS("./cobra_leuk.RDS")
-augmented_leuk_cobra <- augment_cobra(cobra_leuk, leuk_y$V1)
+# cobra_leuk <- readRDS("./cobra_leuk.RDS")
+# augmented_leuk_cobra <- augment_cobra(cobra_leuk, leuk_y$V1)
 cobra_leuk2 <- readRDS("./cobra_2leuk.RDS")
 augmented_leuk_cobra2 <- augment_cobra(cobra_leuk2, leuk_y$V1)
+# cobra_leuk3 <- readRDS("./cobra_3leuk.RDS")
+# augmented_leuk_cobra3 <- augment_cobra(cobra_leuk3, leuk_y$V1)
 
 ```
 
@@ -80,8 +82,17 @@ augmented_leuk_palm <- augment_cv(palm_leuk, leuk_y$V1)
 ```
 
 ```{r}
+sparsebc_leuk <- readRDS("./sparsebc_leuk.RDS")
+for (metric in metrics) {
+  print(metric)
+  print(igraph::compare(sparsebc_leuk$Cs, leuk_y$V1, method =
+                      metric))
+}
+```
+
+```{r}
 lym_y <- read.csv("./data/lymphoma.y.txt", header=FALSE)
-cobra_lym <- readRDS("./cobra_2lym.RDS")
+cobra_lym <- readRDS("./cobra_lym.RDS")
 augmented_lym <- augment_cobra(cobra_lym, lym_y$V1)
 ```
 
@@ -96,9 +107,12 @@ augmented_lym_palm2 <- augment_cv(palm_lym2, lym_y$V1)
 ```
 
 ```{r}
-srbct_y <- read.csv("./data/srbct.y.txt", header=FALSE)
-rscobra_srbct <- readRDS("./rscobra_srbct.RDS")
-augmented_srbct <- augment_cv(rscobra_srbct, srbct_y$V1)
+# srbct_y <- read.csv("./data/srbct.y.txt", header=FALSE)
+# palm_srbct <- readRDS("./palm_srbct.RDS")
+# augmented_srbct_palm <- augment_cv(palm_srbct, srbct_y$V1)
+
+palm_srbct2 <- readRDS("./palm_srbct_tuned.RDS")
+augmented_srbct_palm2 <- augment_cv(palm_srbct2, srbct_y$V1)
 
 cobra_srbct <- readRDS("./cobra_srbct.RDS")
 cobra_augmented_srbct <- augment_cobra(cobra_srbct, srbct_y$V1)
@@ -106,6 +120,6 @@ cobra_augmented_srbct <- augment_cobra(cobra_srbct, srbct_y$V1)
 
 ```{r}
 prostate_y <- read.csv("./data/prostate.y.txt", header=FALSE)
-
-
+palm_prostate <- readRDS("./palm_prostate.RDS")
+augmented_palm_prostate <- augment_cv(palm_prostate, prostate_y$V1)
 ```

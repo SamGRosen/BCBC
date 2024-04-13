@@ -15,7 +15,7 @@ run_palm <- function(X, name, gammas = 2 ^ seq(10, 18, 1)) {
   cv_results <- tune_bcbc(
     X,
     model=palm,
-    lambdas = 2 ^ seq(-7,-5, 0.25),
+    lambdas = 2 ^ seq(-8,-6, 0.25),
     nus = c(2),
     gammas = gammas,
     recalculate_weights = c(TRUE),
@@ -41,11 +41,11 @@ run_palm <- function(X, name, gammas = 2 ^ seq(10, 18, 1)) {
 # lung500 = scale(data.matrix(lung500))
 # run_palm(lung500, "lung500")
 
-# lym <-
-#   t(read.csv("./data/lymphoma.x.txt", header = FALSE, sep = " "))
-# lym <- scale(lym)
-# run_palm(lym, "lym_static", 2^seq(5, 16, 0.5))
-# 
+lym <-
+  t(read.csv("./data/lymphoma.x.txt", header = FALSE, sep = " "))
+lym <- scale(lym)
+run_palm(lym, "lym_tuned2", 2^seq(15, 17, 0.1))
+
 # 
 # srbct <-
 #   t(read.csv("./data/srbct.x.txt", header = FALSE, sep = " "))
@@ -65,10 +65,10 @@ run_palm <- function(X, name, gammas = 2 ^ seq(10, 18, 1)) {
 # run_palm(colon, "colon")
 # 
 
-leuk <-
-  t(read.csv("./data/leukemia.x.txt", header = FALSE, sep = " "))
-leuk <- scale(leuk)
-run_palm(leuk, "leuk2", gammas = 2^seq(13, 16, 0.25))
+# leuk <-
+#   t(read.csv("./data/leukemia.x.txt", header = FALSE, sep = " "))
+# leuk <- scale(leuk)
+# run_palm(leuk, "leuk2", gammas = 2^seq(13, 16, 0.25))
 
 # 
 # prostate <-

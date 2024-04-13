@@ -3,7 +3,7 @@ install.packages("dbscan")
 
 source("./RSCobra.R")
 
-gammas <- 2 ^ seq(10, 16, 0.05)
+gammas <- 2 ^ seq(15, 18, 0.05)
 
 run_cobra <- function(X, name) {
   print(paste(name, "dim", dim(X)))

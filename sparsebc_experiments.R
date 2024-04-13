@@ -12,8 +12,8 @@ run_sparsebc <- function(X, name) {
   kr <-
     sparseBC.choosekr(
       X,
-      k = 1:8,
-      r = 1:25,
+      k = 2:5,
+      r = seq(5, 50, 5),
       lambda = 0,
       percent = 0.125,
       TRUE
@@ -45,12 +45,12 @@ run_sparsebc <- function(X, name) {
 # run_sparsebc(lung500, "lung500")
 # 
 # 
-# lym <-
-#   t(read.csv("./data/lymphoma.x.txt", header = FALSE, sep = " "))
-# lym <- scale(lym)
-# run_sparsebc(lym, "lym")
-# 
-# 
+lym <-
+  t(read.csv("./data/lymphoma.x.txt", header = FALSE, sep = " "))
+lym <- scale(lym)
+run_sparsebc(lym, "lym")
+
+
 # srbct <-
 #   t(read.csv("./data/srbct.x.txt", header = FALSE, sep = " "))
 # srbct <- scale(srbct)
@@ -69,10 +69,10 @@ run_sparsebc <- function(X, name) {
 # run_sparsebc(colon, "colon")
 # 
 
-leuk <-
-  t(read.csv("./data/leukemia.x.txt", header = FALSE, sep = " "))
-leuk <- scale(leuk)
-run_sparsebc(leuk, "leuk")
+# leuk <-
+#   t(read.csv("./data/leukemia.x.txt", header = FALSE, sep = " "))
+# leuk <- scale(leuk)
+# run_sparsebc(leuk, "leuk")
 
 # 
 # prostate <-
