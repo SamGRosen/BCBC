@@ -9,11 +9,22 @@ library(MASS)
 
 ```{r}
 
-mat_df2 <- function(matrix, labels=NULL) {
+mat_df <- function(matrix, labels=NULL, weights=c(), lambda=0, filter_weight=0,
+                    cluster_with_weights=TRUE) {
+  if(length(weights) > 0) {
+      valid_weights <- which(weights > filter_weight)
+      weights <- weights[valid_weights]
+      matrix <- matrix[, valid_weights]
+  }
   df <- as.data.frame(matrix) |>
     mutate(row_num = row_number()) |>
     pivot_longer(!row_num, names_to = "col_num") |>
     mutate(col_num = as.numeric(str_replace(col_num, "V", "")))
+
+  if(length(weights > 0) && cluster_with_weights) {
+    w_vals = sqrt(weights^2 + lambda * weights)
+    matrix <- sweep(matrix, 2, w_vals, "*")
+  }
 
   row_dist <- dist(matrix)
   col_dist <- dist(t(matrix))
@@ -213,19 +224,73 @@ from_palm3 <- tune_bcbc(checker$X, model=palm, lambdas=c(0), gammas=2^seq(10, 15
 
 ```{r}
 set.seed(20)
-check <- gen_checkerboard(100, 200, 10, 10, noise=1, p_extra=1000)
+check <- gen_checkerboard(100, 200, 4, 4, noise=2, p_extra=0, scale=FALSE)
 
 all_checks <- list()
 all_checks[[1]] <- cbind(check$X,
-                         (matrix(rnorm(100*100, sd=1), nrow=100)))
+                         matrix(rnorm(100*100, sd=2), nrow=100))
 for(i in 2:10) {
   all_checks[[i]] <- cbind(all_checks[[i-1]],
-                           (matrix(rnorm(100*100, sd=1), nrow=100)))
+                           matrix(rnorm(100*100, sd=2), nrow=100))
 }
 
+plot_fit(mat_df(check$X, check$row_partition)) / 
+  plot_fit(mat_df(all_checks[[1]], check$row_partition)) / 
+  plot_fit(mat_df(all_checks[[2]], check$row_partition)) /
+  plot_fit(mat_df(all_checks[[3]], check$row_partition)) /
+  plot_fit(mat_df(all_checks[[4]], check$row_partition))
 
+check_sol <- palm(check$X, lambda = 0, gamma = 1000)
+check_sol100 <- palm(all_checks[[1]], lambda = 0.055, gamma = 1500)
+check_sol200 <- palm(all_checks[[2]], lambda = 0.075, gamma = 2000)
+check_sol300 <- palm(all_checks[[3]], lambda = 0.090, gamma = 2500)
+check_sol400 <- palm(all_checks[[4]], lambda = 0.100, gamma = 3000)
 
-
+plot_fit(
+  mat_df(
+    check_sol$U,
+    weights = check_sol$w,
+    labels = check$row_partition,
+    lambda = 0,
+    cluster_with_weights = FALSE
+  )
+) /
+  plot_fit(
+    mat_df(
+      check_sol100$U,
+      weights = check_sol100$w,
+      labels = check$row_partition,
+      lambda = 0.055,
+      cluster_with_weights = FALSE
+    )
+  ) /
+  plot_fit(
+    mat_df(
+      check_sol200$U,
+      weights = check_sol200$w,
+      labels = check$row_partition,
+      lambda = 0.075,
+      cluster_with_weights = FALSE
+    )
+  ) /
+  plot_fit(
+    mat_df(
+      check_sol300$U,
+      weights = check_sol300$w,
+      labels = check$row_partition,
+      lambda = 0.090,
+      cluster_with_weights = FALSE
+    )
+  ) /
+  plot_fit(
+    mat_df(
+      check_sol400$U,
+      weights = check_sol400$w,
+      labels = check$row_partition,
+      lambda = 0.100,
+      cluster_with_weights = FALSE
+    )
+  )
 ```
 
 
@@ -233,13 +298,12 @@ for(i in 2:10) {
 # Real Data
 
 ```{r}
-plot_fit <- function(matrix, labels, title="") {
-  plot_df <- mat_df2(matrix, labels)
+plot_fit <- function(plot_df, title="") {
   ggplot(plot_df, aes(x = order_col, y = order_row)) +
     geom_raster(aes(fill = value)) +
     annotate(
       geom = "rect",
-      xmin = -ncol(matrix) / 25,
+      xmin = -max(plot_df$order_col) / 25,
       xmax = 0,
       ymin = plot_df$order_row - 0.5,
       ymax = plot_df$order_row + 0.5,
@@ -262,12 +326,15 @@ plot_fit <- function(matrix, labels, title="") {
       axis.text.x = element_blank(),
       axis.ticks.x = element_blank(),
       axis.text.y = element_blank(),
-      axis.ticks.y = element_blank()
+      axis.ticks.y = element_blank(),
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      axis.title=element_blank()
     ) +
-    # guides(fill = "none") +
-    xlab("") +
-    ylab("") +
-    ggtitle(title)
+    guides(fill = "none")
+    # xlab("") +
+    # ylab("") +
+    # ggtitle(title)
 }
 
 ```

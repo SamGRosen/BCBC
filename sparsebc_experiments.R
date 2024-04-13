@@ -18,6 +18,8 @@ run_sparsebc <- function(X, name) {
       percent = 0.125,
       TRUE
     )
+  
+  saveRDS(kr, "./sparsebc_kr_temp.RDS")
   lambda <- sparseBC.BIC(X,
                          kr$estimated_kr[1, 1],
                          kr$estimated_kr[1, 2],
