@@ -364,9 +364,9 @@ plot_fit <- function(plot_df, title="") {
 ## Leuk
 
 ```{r}
-# sparsebc_leuk <- readRDS("./sparsebc_leuk.RDS")
-# palm_leuk <- readRDS("./palm_leuk2.RDS")
-# cobra_leuk <- readRDS("./cobra_leuk.RDS")
+sparsebc_leuk <- readRDS("./sparsebc_leuk.RDS")
+palm_leuk <- readRDS("./palm_leuk3.RDS")
+cobra_leuk <- readRDS("./cobra_2leuk.RDS")
 
 leuk_y <- read.csv("./data/leukemia.y.txt", header = FALSE)
 leuk <- t(read.csv("./data/leukemia.x.txt", header = FALSE, sep = " "))
@@ -375,28 +375,40 @@ leuk <- scale(leuk)
 
 ```{r}
 leuk_dist <- dist(leuk)
+leuk_dist_col <- dist(t(leuk))
 
 cut_tree_leuk <-
   cutreeDynamic(hclust(leuk_dist),
                 minClusterSize = 9,
                 distM = as.matrix(leuk_dist))
 
+cut_tree_leuk_col <-
+  cutreeDynamic(hclust(leuk_dist_col),
+                minClusterSize = 20,
+                distM = as.matrix(leuk_dist_col))
+
 igraph::compare(cut_tree_leuk,
                 leuk_y$V1,
                 method="adjusted.rand")
 
-plot_fit(leuk, leuk_y$V1, "Gene Expression Pattern of Leukemia Samples")
+plot_fit(mat_df(leuk, leuk_y$V1), "Gene Expression Pattern of Leukemia Samples")
 ```
 
 ```{r}
 
-igraph::compare(palm_leuk$row_clusters[[100]],
+igraph::compare(palm_leuk$row_clusters[[157]],
                 leuk_y$V1,
                 method="adjusted.rand")
 
-plot_fit(mat_df(palm_leuk$all_runs[[100]]$U,
-                leuk_y$V1),
-         "Biclustering of Leukemia Data (BCBC)")
+plot_fit(
+  mat_df(
+    palm_leuk$all_runs[[157]]$U,
+    leuk_y$V1,
+    weights = palm_leuk$all_runs[[157]]$w,
+    cluster_with_weights = TRUE
+  ),
+  "Biclustering of Leukemia Data (BCBC)"
+)
 ```
 
 ```{r}
@@ -411,11 +423,11 @@ plot_fit(mat_df(sparsebc_leuk$mus,
 ```
 
 ```{r}
-igraph::compare(cobra_leuk$groups_col[[24]]$cluster,
+igraph::compare(cobra_leuk$groups_col[[93]]$cluster,
                 leuk_y$V1,
                 method="adjusted.rand")
 
-plot_fit(mat_df(t(cobra_leuk$U[[24]]),
+plot_fit(mat_df(t(cobra_leuk$U[[93]]),
                 leuk_y$V1),
          "Biclustering of Leukemia Data (COBRA)")
 ```
@@ -464,7 +476,8 @@ plot_fit(
   mat_df(
     palm_lym$all_runs[[86]]$U,
     labels = lym_y$V1,
-    cluster_with_weights = FALSE
+    cluster_with_weights = TRUE,
+    weights = palm_lym$all_runs[[86]]$w
   ),
   "Biclustering of Lymphoma Data (BCBC)"
 )
