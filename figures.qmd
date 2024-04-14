@@ -69,18 +69,6 @@ mat_df <- function(matrix, labels=NULL, weights=c(), lambda=0, filter_weight=0,
 # solutions <- cvxclust_path_admm(X, w, gammas, nu=1)
 ```
 
-
-```{r}
-
-only_rows <- palm(checker$X, 0, gamma= 1, k_row=2, k_col=2)
-plot_matrix(mat_df(only_rows))
-```
-
-```{r}
-plot_matrix(mat_df(only_rows))
-```
-
-
 # Convex Clustering Examples
 
 ```{r}
@@ -295,6 +283,40 @@ plot_fit(
 
 
 
+# PALM data
+
+```{r}
+
+num_iters = 20
+x = rep(NA, num_iters)
+x[1] = 0.1
+x_grad = rep(0, num_iters)
+y = rep(NA, num_iters)
+y[1] = 0.15
+y_grad = rep(0, num_iters)
+
+prox <- function(input, nu, offset = 1) {
+  if(input > offset + nu) {
+    return(input - nu)
+  } else if(input < nu - offset){
+    return(input + nu)
+  }
+  return(offset)
+}
+
+for(i in 2:num_iters) {
+  lip_y =  (y[i - 1] ^ 2 + 0.25)
+  x_grad[i] = x[i - 1] -  2 * x[i - 1] * lip_y
+  x[i] = prox(x_grad[i], 1)
+  
+  lip_x =  (x[i] ^ 2 + 0.25)
+  y_grad[i] = y[i - 1] -  2 * y[i - 1] * lip_x
+  y[i] = prox(y_grad[i], 1)
+}
+
+```
+
+
 # Real Data
 
 ```{r}
@@ -329,12 +351,12 @@ plot_fit <- function(plot_df, title="") {
       axis.ticks.y = element_blank(),
       axis.title.x = element_blank(),
       axis.title.y = element_blank(),
-      axis.title=element_blank()
+      plot.title = element_text(size=30)
     ) +
-    guides(fill = "none")
-    # xlab("") +
-    # ylab("") +
-    # ggtitle(title)
+    guides(fill = "none") +
+    # xlab("Genes") +
+    # ylab("Samples") +
+    ggtitle(title)
 }
 
 ```
@@ -352,6 +374,17 @@ leuk <- scale(leuk)
 ```
 
 ```{r}
+leuk_dist <- dist(leuk)
+
+cut_tree_leuk <-
+  cutreeDynamic(hclust(leuk_dist),
+                minClusterSize = 9,
+                distM = as.matrix(leuk_dist))
+
+igraph::compare(cut_tree_leuk,
+                leuk_y$V1,
+                method="adjusted.rand")
+
 plot_fit(leuk, leuk_y$V1, "Gene Expression Pattern of Leukemia Samples")
 ```
 
@@ -361,9 +394,9 @@ igraph::compare(palm_leuk$row_clusters[[100]],
                 leuk_y$V1,
                 method="adjusted.rand")
 
-plot_fit(palm_leuk$all_runs[[100]]$U,
-         leuk_y$V1,
-         "Gene Expression Pattern of Leukemia Samples (PALM)")
+plot_fit(mat_df(palm_leuk$all_runs[[100]]$U,
+                leuk_y$V1),
+         "Biclustering of Leukemia Data (BCBC)")
 ```
 
 ```{r}
@@ -372,9 +405,9 @@ igraph::compare(sparsebc_leuk$Cs,
                 leuk_y$V1,
                 method="adjusted.rand")
 
-plot_fit(sparsebc_leuk$mus,
-         leuk_y$V1,
-         "Gene Expression Pattern of Leukemia Samples (SparseBC)")
+plot_fit(mat_df(sparsebc_leuk$mus,
+                leuk_y$V1),
+         "Biclustering of Leukemia Data (SparseBC)")
 ```
 
 ```{r}
@@ -382,17 +415,17 @@ igraph::compare(cobra_leuk$groups_col[[24]]$cluster,
                 leuk_y$V1,
                 method="adjusted.rand")
 
-plot_fit(t(cobra_leuk$U[[24]]),
-         leuk_y$V1,
-         "Gene Expression Pattern of Leukemia Samples (COBRA)")
+plot_fit(mat_df(t(cobra_leuk$U[[24]]),
+                leuk_y$V1),
+         "Biclustering of Leukemia Data (COBRA)")
 ```
 
 ## Lym
 
 ```{r}
-# sparsebc_leuk <- readRDS("./sparsebc_leuk.RDS")
-palm_lym <- readRDS("./palm_lym.RDS")
-# cobra_lym <- readRDS("./cobra_lym.RDS")
+# sparsebc_lym <- readRDS("./sparsebc_lym.RDS")
+# palm_lym <- readRDS("./palm_lym_tuned3.RDS")
+cobra_lym <- readRDS("./cobra_lym.RDS")
 
 lym_y <- read.csv("./data/lymphoma.y.txt", header = FALSE)
 lym <- t(read.csv("./data/lymphoma.x.txt", header = FALSE, sep = " "))
@@ -400,38 +433,62 @@ lym <- scale(lym)
 ```
 
 ```{r}
-plot_fit(lym, lym_y$V1, "Gene Expression Pattern of Lymphoma Samples")
 
-```
+lym_dist <- dist(lym)
+lym_dist_col <- dist(t(lym))
 
-```{r}
-igraph::compare(palm_lym$row_clusters[[82]],
+cut_tree_lym <-
+  cutreeDynamic(hclust(lym_dist),
+                minClusterSize = 9,
+                distM = as.matrix(lym_dist))
+
+cut_tree_lym_col <-
+  cutreeDynamic(hclust(lym_dist_col),
+                minClusterSize = 20,
+                distM = as.matrix(lym_dist_col))
+
+igraph::compare(cut_tree_lym,
                 lym_y$V1,
                 method="adjusted.rand")
 
-plot_fit(palm_lym$all_runs[[82]]$U,
-         lym_y$V1,
-         "Gene Expression Pattern of Lymphoma Samples (PALM)")
+plot_fit(mat_df(lym, lym_y$V1),
+         "Gene Expression Pattern of Lymphoma Samples")
 ```
 
 ```{r}
-igraph::compare(cobra_lym$row_clusters[[82]],
+igraph::compare(palm_lym$row_clusters[[86]],
                 lym_y$V1,
                 method="adjusted.rand")
 
-plot_fit(t(cobra_lym$U[[24]]),
-         lym_y$V1,
-         "Gene Expression Pattern of Lymphoma Samples (COBRA)")
+plot_fit(
+  mat_df(
+    palm_lym$all_runs[[86]]$U,
+    labels = lym_y$V1,
+    cluster_with_weights = FALSE
+  ),
+  "Biclustering of Lymphoma Data (BCBC)"
+)
 ```
 
 ```{r}
-igraph::compare(sparsebc_lym$row_clusters[[82]],
+igraph::compare(cobra_lym$groups_col[[44]]$cluster,
                 lym_y$V1,
                 method="adjusted.rand")
 
-plot_fit(sparsebc_lym$row_clusters[[82]],
-         lym_y$V1,
-         "Gene Expression Pattern of Lymphoma Samples (SparseBC)")
+plot_fit(mat_df(t(cobra_lym$U[[44]]),
+         lym_y$V1),
+         "Biclustering of Lymphoma Data (COBRA)")
+```
+
+```{r}
+igraph::compare(sparsebc_lym$Cs,
+                lym_y$V1,
+                method="adjusted.rand")
+
+plot_fit(mat_df(
+  sparsebc_lym$mus,
+  lym_y$V1),
+  "Biclustering of Lymphoma Data (SparseBC)")
 ```
 
 

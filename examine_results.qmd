@@ -92,8 +92,8 @@ for (metric in metrics) {
 
 ```{r}
 lym_y <- read.csv("./data/lymphoma.y.txt", header=FALSE)
-cobra_lym <- readRDS("./cobra_lym.RDS")
-augmented_lym <- augment_cobra(cobra_lym, lym_y$V1)
+# cobra_lym <- readRDS("./cobra_lym.RDS")
+# augmented_lym <- augment_cobra(cobra_lym, lym_y$V1)
 ```
 
 ```{r}
@@ -104,6 +104,9 @@ augmented_lym_palm <- augment_cv(palm_lym, lym_y$V1)
 ```{r}
 palm_lym2 <- readRDS("./palm_lym_tuned.RDS")
 augmented_lym_palm2 <- augment_cv(palm_lym2, lym_y$V1)
+
+palm_lym3 <- readRDS("./palm_lym_tuned3.RDS")
+augmented_lym_palm3 <- augment_cv(palm_lym3, lym_y$V1)
 ```
 
 ```{r}
