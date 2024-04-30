@@ -317,6 +317,72 @@ for(i in 2:num_iters) {
 ```
 
 
+
+# Contour Plots
+
+```{r}
+coordinate_wise_minima <- function(fixed) {
+  opt <- rep(NA, length(fixed))
+  for(i in seq_along(fixed)) {
+    f <- function(x) {
+      (x ^ 2 + 1 / 4) * (fixed[i] ^ 2 + 1 / 4) + abs(x - 1) + abs(fixed[i] - 1)
+    }
+    opt[i] <- optim(1, f, method="Brent", lower=-10, upper=10)$par
+  }
+  cbind(fixed, opt)
+}
+
+coordinate_wise_palm_minima <- function(fixed) {
+  opt <- rep(NA, length(fixed))
+  for(i in seq_along(fixed)) {
+    f <- function(x) {
+      lip =  (fixed[i] ^ 2 + 0.25)
+      (x - prox(x, x - 2 * x * lip))^2
+    }
+    opt[i] <- optim(1, f, method="Brent", lower=-2, upper=2)$par
+  }
+  cbind(fixed, opt)
+}
+
+```
+
+
+```{r}
+x1 <- seq(0.1, 1.1, 0.005)
+x2 <- seq(0.1, 1.1, 0.005)
+
+biconvex_func <- function(x, y) {
+  (x ^ 2 + 1 / 4) * (y ^ 2 + 1 / 4) + abs(x - 1) + abs(y - 1)
+}
+
+minima_curves <- as.data.frame(coordinate_wise_palm_minima(seq(0.1, 1.1, 0.01)))
+
+expand.grid(X1 = x1, X2 = x2) |>
+  mutate(Z = biconvex_func(X1, X2)) |>
+  ggplot() +
+  geom_contour(aes(X1, X2, z = Z)) +
+  geom_contour_filled(
+    aes(X1, X2, z = Z),
+    colour="black",
+    breaks = c(
+      seq(1.11, 1.2, 0.01),
+      seq(1.25, 1.4, 0.05),
+      seq(1.5, 2, .1)),
+    alpha=0.85
+  ) +
+  geom_path(data=minima_curves, mapping=aes(fixed, opt), color="cyan", linetype=1, linewidth=1.1) +
+  geom_path(data=minima_curves, mapping=aes(opt, fixed), color="green", linetype=1, linewidth=1.1) +
+  scale_fill_viridis_d(option="C") +
+  guides(fill="none") +
+  theme_minimal() +
+  scale_x_continuous(breaks=seq(0.1, 1.1, 0.1)) + 
+  scale_y_continuous(breaks=seq(0.1, 1.1, 0.1)) + 
+  xlab("x") + 
+  ylab("y")
+
+```
+
+
 # Real Data
 
 ```{r}
