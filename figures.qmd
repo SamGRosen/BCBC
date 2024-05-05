@@ -211,6 +211,38 @@ ggplot(mat_df2(checker$X), aes(x = order_col, y = order_row)) +
           axis.ticks.x = element_blank())
 
 from_palm3 <- tune_bcbc(checker$X, model=palm, lambdas=c(0), gammas=2^seq(10, 15, 0.5), recalculate_weights = TRUE, progress = TRUE)
+
+# devtools::install_github("nicolash2/ggdendroplot")
+
+plot_fit(
+    mat_df(
+        examplebcbc$U,
+        weights = examplebcbc$w,
+        labels = examplebcbcdata$row_partition,
+        lambda = 0,
+        cluster_with_weights = FALSE
+    )
+)
+
+as_df <- mat_df(
+        examplebcbcdata$X,
+        labels = examplebcbcdata$row_partition,
+    )
+
+colnames(examplebcbcdata$X) <- 1:ncol(examplebcbcdata$X)
+rownames(examplebcbcdata$X) <- 1:nrow(examplebcbcdata$X)
+row_dist <- as.matrix(dist(examplebcbcdata$X))
+row_dist <- row_dist - min(row_dist[row_dist > 0])
+diag(row_dist) <- 0 
+col_dist <- as.matrix(t(dist(examplebcbcdata$X)))
+col_dist <- col_dist - min(col_dist[col_dist > 0])
+diag(col_dist) <- 0 
+row_hclust <- hclust(as.dist(row_dist))
+col_hclust <- hclust(as.dist(col_dist))
+
+plot_fit(as_df) + 
+  geom_dendro(row_hclust, pointing="side", xlim=c(500, 600)) +
+  geom_dendro(col_hclust, xlim=c(0, 500), ylim=c(201, 241))
 ```
 
 # Clustering Dimension
@@ -413,25 +445,25 @@ plot_fit <- function(plot_df, title="") {
         TRUE ~ "black"
       )
     ) +
-    annotate(
-      geom = "rect",
-      xmin = -2 * max(plot_df$order_col) / 25,
-      xmax = -max(plot_df$order_col) / 25,
-      ymin = plot_df$order_row - 0.5,
-      ymax = plot_df$order_row + 0.5,
-      fill = case_when(
-        plot_df$label2 == 1 ~ "green",
-        plot_df$label2 == 2 ~ "yellow",
-        plot_df$label2 == 3 ~ "purple",
-        plot_df$label2 == 4 ~ "grey",
-        plot_df$label2 == 5 ~ "orange",
-        plot_df$label2 == 6 ~ "blue",
-        plot_df$label2 == 7 ~ "red",
-        plot_df$label2 == 8 ~ "magenta",
-        plot_df$label2 == 9 ~ "pink",
-        TRUE ~ "black"
-      )
-    ) +
+    # annotate(
+    #   geom = "rect",
+    #   xmin = -2 * max(plot_df$order_col) / 25,
+    #   xmax = -max(plot_df$order_col) / 25,
+    #   ymin = plot_df$order_row - 0.5,
+    #   ymax = plot_df$order_row + 0.5,
+    #   fill = case_when(
+    #     plot_df$label2 == 1 ~ "green",
+    #     plot_df$label2 == 2 ~ "yellow",
+    #     plot_df$label2 == 3 ~ "purple",
+    #     plot_df$label2 == 4 ~ "grey",
+    #     plot_df$label2 == 5 ~ "orange",
+    #     plot_df$label2 == 6 ~ "blue",
+    #     plot_df$label2 == 7 ~ "red",
+    #     plot_df$label2 == 8 ~ "magenta",
+    #     plot_df$label2 == 9 ~ "pink",
+    #     TRUE ~ "black"
+    #   )
+    # ) +
     scale_fill_gradient2() +
     theme_minimal() +
     theme(
