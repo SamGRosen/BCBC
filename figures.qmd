@@ -321,25 +321,27 @@ for(i in 2:num_iters) {
 # Contour Plots
 
 ```{r}
-coordinate_wise_minima <- function(fixed) {
-  opt <- rep(NA, length(fixed))
-  for(i in seq_along(fixed)) {
-    f <- function(x) {
-      (x ^ 2 + 1 / 4) * (fixed[i] ^ 2 + 1 / 4) + abs(x - 1) + abs(fixed[i] - 1)
-    }
-    opt[i] <- optim(1, f, method="Brent", lower=-10, upper=10)$par
-  }
-  cbind(fixed, opt)
+
+biconvex_func2 <- function(x, y) {
+  ((x ^ 2 + 2) * (y ^ 4 + 0.25) + abs(x-5) + abs(y-5))
 }
 
-coordinate_wise_palm_minima <- function(fixed) {
-  opt <- rep(NA, length(fixed))
+biconvex_func <- function(x, y) {
+  biconvex_func2(x/0.1, y/3.1)
+}
+
+
+coordinate_wise_minima <- function(fixed) {
+  opt <- matrix(NA, nrow=length(fixed), ncol=2)
   for(i in seq_along(fixed)) {
     f <- function(x) {
-      lip =  (fixed[i] ^ 2 + 0.25)
-      (x - prox(x, x - 2 * x * lip))^2
+      biconvex_func(x, fixed[i])
     }
-    opt[i] <- optim(1, f, method="Brent", lower=-2, upper=2)$par
+    f2 <- function(y) {
+      biconvex_func(fixed[i], y)
+    }
+    opt[i, 1] <- optim(1, f, method="Brent", lower=-10, upper=10)$par
+    opt[i, 2] <- optim(1, f2, method="Brent", lower=-10, upper=10)$par
   }
   cbind(fixed, opt)
 }
@@ -348,14 +350,14 @@ coordinate_wise_palm_minima <- function(fixed) {
 
 
 ```{r}
-x1 <- seq(0.1, 1.1, 0.005)
-x2 <- seq(0.1, 1.1, 0.005)
+xmin = -1
+xmax = 1
+ymin = xmin
+ymax = xmax
+x1 <- seq(xmin, xmax, 0.005)
+x2 <- seq(ymin, ymax, 0.005)
 
-biconvex_func <- function(x, y) {
-  (x ^ 2 + 1 / 4) * (y ^ 2 + 1 / 4) + abs(x - 1) + abs(y - 1)
-}
-
-minima_curves <- as.data.frame(coordinate_wise_palm_minima(seq(0.1, 1.1, 0.01)))
+minima_curves <- as.data.frame(coordinate_wise_minima(seq(min(xmin, ymin), max(xmax, ymax), 0.01)))
 
 expand.grid(X1 = x1, X2 = x2) |>
   mutate(Z = biconvex_func(X1, X2)) |>
@@ -364,21 +366,51 @@ expand.grid(X1 = x1, X2 = x2) |>
   geom_contour_filled(
     aes(X1, X2, z = Z),
     colour="black",
-    breaks = c(
-      seq(1.11, 1.2, 0.01),
-      seq(1.25, 1.4, 0.05),
-      seq(1.5, 2, .1)),
-    alpha=0.85
+    bins=200,
+    # breaks = c(
+    #   seq(1.11, 1.2, 0.01),
+    #   seq(1.25, 1.4, 0.05),
+    #   seq(1.5, 2, .1)),
+    # alpha=0.85
   ) +
-  geom_path(data=minima_curves, mapping=aes(fixed, opt), color="cyan", linetype=1, linewidth=1.1) +
-  geom_path(data=minima_curves, mapping=aes(opt, fixed), color="green", linetype=1, linewidth=1.1) +
+  geom_path(data=minima_curves, mapping=aes(fixed, V3), color="cyan", linetype=1, linewidth=1.1) +
+  geom_path(data=minima_curves, mapping=aes(V2, fixed), color="green", linetype=1, linewidth=1.1) +
   scale_fill_viridis_d(option="C") +
   guides(fill="none") +
   theme_minimal() +
-  scale_x_continuous(breaks=seq(0.1, 1.1, 0.1)) + 
-  scale_y_continuous(breaks=seq(0.1, 1.1, 0.1)) + 
+  scale_x_continuous(breaks=seq(xmin, xmax, 0.25)) + 
+  scale_y_continuous(breaks=seq(ymin, ymax, 0.25)) + 
   xlab("x") + 
   ylab("y")
+  # coord_cartesian(xlim=c(1.85, 2.05), ylim=c(0, 0.2))
+
+```
+
+```{r}
+biconvex_func2 <- function(x, y) {
+  ((x ^ 2 + 2) * (y ^ 4 + 0.1) + abs(x-2) + 3 * abs(y-2))
+}
+
+biconvex_func <- function(x, y) {
+  biconvex_func2((x*10+abs(x)/30), y + abs(y)/4)
+}
+
+biconvex_func <- function(x, y) {
+  biconvex_func2((3*x + x^2)*10, y*3 + y^2/5)
+}
+
+biconvex_func <- function(x, y) {
+  biconvex_func2(x*5, y)
+}
+
+# [1] 5.705434
+# [1] 0.1407357
+
+minima_curves <- as.data.frame(coordinate_wise_minima(seq(min(xmin, ymin), max(xmax, ymax), 0.001)))
+max(abs(diff(minima_curves[, 2]))) / 0.001
+max(abs(diff(minima_curves[, 3]))) / 0.001
+
+max(abs(diff(minima_curves[, 2]))) / 0.001 * max(abs(diff(minima_curves[, 3]))) / 0.001
 
 ```
 
