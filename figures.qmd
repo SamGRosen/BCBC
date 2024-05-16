@@ -9,7 +9,7 @@ library(MASS)
 
 ```{r}
 
-mat_df <- function(matrix, labels=NULL, weights=c(), lambda=0, filter_weight=0,
+mat_df <- function(matrix, labels=NULL, labels2=NULL, weights=c(), lambda=0, filter_weight=0,
                     cluster_with_weights=TRUE) {
   if(length(weights) > 0) {
       valid_weights <- which(weights > filter_weight)
@@ -46,6 +46,13 @@ mat_df <- function(matrix, labels=NULL, weights=c(), lambda=0, filter_weight=0,
   } else {
     df <- df |>
       inner_join(tibble(row_num = 1:length(h_row$order), label = labels))
+  }
+  
+  if (is.null(labels2)) {
+    return(df)
+  } else {
+    df <- df |>
+      inner_join(tibble(row_num = 1:length(h_row$order), label2 = labels2))
   }
   df
 }
@@ -188,9 +195,7 @@ ggplot(to_plot) +
     axis.title.y = element_blank(),
     axis.ticks = element_blank()
   ) +
-  guides(color = "none") +
-  ggtitle("Convex clustering solution path for 3 clusters")
-
+  guides(color = "none")
 ```
 
 # Biclustering Example
@@ -206,6 +211,38 @@ ggplot(mat_df2(checker$X), aes(x = order_col, y = order_row)) +
           axis.ticks.x = element_blank())
 
 from_palm3 <- tune_bcbc(checker$X, model=palm, lambdas=c(0), gammas=2^seq(10, 15, 0.5), recalculate_weights = TRUE, progress = TRUE)
+
+# devtools::install_github("nicolash2/ggdendroplot")
+
+plot_fit(
+    mat_df(
+        examplebcbc$U,
+        weights = examplebcbc$w,
+        labels = examplebcbcdata$row_partition,
+        lambda = 0,
+        cluster_with_weights = FALSE
+    )
+)
+
+as_df <- mat_df(
+        examplebcbcdata$X,
+        labels = examplebcbcdata$row_partition,
+    )
+
+colnames(examplebcbcdata$X) <- 1:ncol(examplebcbcdata$X)
+rownames(examplebcbcdata$X) <- 1:nrow(examplebcbcdata$X)
+row_dist <- as.matrix(dist(examplebcbcdata$X))
+row_dist <- row_dist - min(row_dist[row_dist > 0])
+diag(row_dist) <- 0 
+col_dist <- as.matrix(t(dist(examplebcbcdata$X)))
+col_dist <- col_dist - min(col_dist[col_dist > 0])
+diag(col_dist) <- 0 
+row_hclust <- hclust(as.dist(row_dist))
+col_hclust <- hclust(as.dist(col_dist))
+
+plot_fit(as_df) + 
+  geom_dendro(row_hclust, pointing="side", xlim=c(500, 600)) +
+  geom_dendro(col_hclust, xlim=c(0, 500), ylim=c(201, 241))
 ```
 
 # Clustering Dimension
@@ -440,6 +477,25 @@ plot_fit <- function(plot_df, title="") {
         TRUE ~ "black"
       )
     ) +
+    # annotate(
+    #   geom = "rect",
+    #   xmin = -2 * max(plot_df$order_col) / 25,
+    #   xmax = -max(plot_df$order_col) / 25,
+    #   ymin = plot_df$order_row - 0.5,
+    #   ymax = plot_df$order_row + 0.5,
+    #   fill = case_when(
+    #     plot_df$label2 == 1 ~ "green",
+    #     plot_df$label2 == 2 ~ "yellow",
+    #     plot_df$label2 == 3 ~ "purple",
+    #     plot_df$label2 == 4 ~ "grey",
+    #     plot_df$label2 == 5 ~ "orange",
+    #     plot_df$label2 == 6 ~ "blue",
+    #     plot_df$label2 == 7 ~ "red",
+    #     plot_df$label2 == 8 ~ "magenta",
+    #     plot_df$label2 == 9 ~ "pink",
+    #     TRUE ~ "black"
+    #   )
+    # ) +
     scale_fill_gradient2() +
     theme_minimal() +
     theme(
@@ -464,7 +520,7 @@ plot_fit <- function(plot_df, title="") {
 ```{r}
 sparsebc_leuk <- readRDS("./sparsebc_leuk.RDS")
 palm_leuk <- readRDS("./palm_leuk3.RDS")
-cobra_leuk <- readRDS("./cobra_2leuk.RDS")
+# cobra_leuk <- readRDS("./cobra_3leuk.RDS")
 
 leuk_y <- read.csv("./data/leukemia.y.txt", header = FALSE)
 leuk <- t(read.csv("./data/leukemia.x.txt", header = FALSE, sep = " "))
@@ -521,20 +577,26 @@ plot_fit(mat_df(sparsebc_leuk$mus,
 ```
 
 ```{r}
-igraph::compare(cobra_leuk$groups_col[[93]]$cluster,
+igraph::compare(cobra_leuk$groups_col[[39]]$cluster,
                 leuk_y$V1,
                 method="adjusted.rand")
 
-plot_fit(mat_df(t(cobra_leuk$U[[93]]),
+plot_fit(mat_df(t(cobra_leuk$U[[39]]),
                 leuk_y$V1),
          "Biclustering of Leukemia Data (COBRA)")
+
+plot_fit(mat_df(t(cobra_leuk$U[[39]]),
+                leuk_y$V1,
+                labels2 = cobra_leuk$groups_col[[39]]$cluster),
+         "Biclustering of Leukemia Data (COBRA)")
+
 ```
 
 ## Lym
 
 ```{r}
-# sparsebc_lym <- readRDS("./sparsebc_lym.RDS")
-# palm_lym <- readRDS("./palm_lym_tuned3.RDS")
+sparsebc_lym <- readRDS("./sparsebc_lym.RDS")
+palm_lym <- readRDS("./palm_lym_tuned3.RDS")
 cobra_lym <- readRDS("./cobra_lym.RDS")
 
 lym_y <- read.csv("./data/lymphoma.y.txt", header = FALSE)
