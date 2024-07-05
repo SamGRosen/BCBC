@@ -8,58 +8,9 @@ library(MASS)
 # Helper Functions 
 
 ```{r}
-
-mat_df <- function(matrix, labels=NULL, labels2=NULL, weights=c(), lambda=0, filter_weight=0,
-                    cluster_with_weights=TRUE) {
-  if(length(weights) > 0) {
-      valid_weights <- which(weights > filter_weight)
-      weights <- weights[valid_weights]
-      matrix <- matrix[, valid_weights]
-  }
-  df <- as.data.frame(matrix) |>
-    mutate(row_num = row_number()) |>
-    pivot_longer(!row_num, names_to = "col_num") |>
-    mutate(col_num = as.numeric(str_replace(col_num, "V", "")))
-
-  if(length(weights > 0) && cluster_with_weights) {
-    w_vals = sqrt(weights^2 + lambda * weights)
-    matrix <- sweep(matrix, 2, w_vals, "*")
-  }
-
-  row_dist <- dist(matrix)
-  col_dist <- dist(t(matrix))
-  
-  h_row <- hclust(row_dist)
-  h_col <- hclust(col_dist)
-  df <- df |>
-    inner_join(tibble(
-      row_num = h_row$order,
-      order_row = 1:length(h_row$order)
-    )) |>
-    inner_join(tibble(
-      col_num = h_col$order,
-      order_col = 1:length(h_col$order)
-    ))
-
-  if (is.null(labels)) {
-    return(df)
-  } else {
-    df <- df |>
-      inner_join(tibble(row_num = 1:length(h_row$order), label = labels))
-  }
-  
-  if (is.null(labels2)) {
-    return(df)
-  } else {
-    df <- df |>
-      inner_join(tibble(row_num = 1:length(h_row$order), label2 = labels2))
-  }
-  df
-}
-
 # checker <- gen_checkerboard(6, 40, 2, 2, noise=1, shuffle = TRUE)
 # 
-# ggplot(mat_df(checker$X), aes(x = order_col, y = order_row)) +
+# ggplot(matrix_to_df(checker$X), aes(x = order_col, y = order_row)) +
 #     geom_raster(aes(fill = value)) +
 #     scale_fill_gradient2() +
 #     theme_minimal() +
@@ -79,8 +30,6 @@ mat_df <- function(matrix, labels=NULL, labels2=NULL, weights=c(), lambda=0, fil
 # Convex Clustering Examples
 
 ```{r}
-
-
 per_cluster <- 30
 num_solutions <- 9
 
@@ -203,7 +152,7 @@ ggplot(to_plot) +
 ```{r}
 checker <- gen_checkerboard(300, 300, 10, 10, noise=1.5, shuffle = TRUE, prob_empty = 0.5, scale=FALSE)
 
-ggplot(mat_df2(checker$X), aes(x = order_col, y = order_row)) +
+ggplot(matrix_to_df2(checker$X), aes(x = order_col, y = order_row)) +
     geom_raster(aes(fill = value)) +
     scale_fill_gradient2() +
     theme_minimal() +
@@ -215,7 +164,7 @@ from_palm3 <- tune_bcbc(checker$X, model=palm, lambdas=c(0), gammas=2^seq(10, 15
 # devtools::install_github("nicolash2/ggdendroplot")
 
 plot_fit(
-    mat_df(
+    matrix_to_df(
         examplebcbc$U,
         weights = examplebcbc$w,
         labels = examplebcbcdata$row_partition,
@@ -224,7 +173,7 @@ plot_fit(
     )
 )
 
-as_df <- mat_df(
+as_df <- matrix_to_df(
         examplebcbcdata$X,
         labels = examplebcbcdata$row_partition,
     )
@@ -259,11 +208,11 @@ for(i in 2:10) {
                            matrix(rnorm(100*100, sd=2), nrow=100))
 }
 
-plot_fit(mat_df(check$X, check$row_partition)) / 
-  plot_fit(mat_df(all_checks[[1]], check$row_partition)) / 
-  plot_fit(mat_df(all_checks[[2]], check$row_partition)) /
-  plot_fit(mat_df(all_checks[[3]], check$row_partition)) /
-  plot_fit(mat_df(all_checks[[4]], check$row_partition))
+plot_fit(matrix_to_df(check$X, check$row_partition)) / 
+  plot_fit(matrix_to_df(all_checks[[1]], check$row_partition)) / 
+  plot_fit(matrix_to_df(all_checks[[2]], check$row_partition)) /
+  plot_fit(matrix_to_df(all_checks[[3]], check$row_partition)) /
+  plot_fit(matrix_to_df(all_checks[[4]], check$row_partition))
 
 check_sol <- palm(check$X, lambda = 0, gamma = 1000)
 check_sol100 <- palm(all_checks[[1]], lambda = 0.055, gamma = 1500)
@@ -272,7 +221,7 @@ check_sol300 <- palm(all_checks[[3]], lambda = 0.090, gamma = 2500)
 check_sol400 <- palm(all_checks[[4]], lambda = 0.100, gamma = 3000)
 
 plot_fit(
-  mat_df(
+  matrix_to_df(
     check_sol$U,
     weights = check_sol$w,
     labels = check$row_partition,
@@ -281,7 +230,7 @@ plot_fit(
   )
 ) /
   plot_fit(
-    mat_df(
+    matrix_to_df(
       check_sol100$U,
       weights = check_sol100$w,
       labels = check$row_partition,
@@ -290,7 +239,7 @@ plot_fit(
     )
   ) /
   plot_fit(
-    mat_df(
+    matrix_to_df(
       check_sol200$U,
       weights = check_sol200$w,
       labels = check$row_partition,
@@ -299,7 +248,7 @@ plot_fit(
     )
   ) /
   plot_fit(
-    mat_df(
+    matrix_to_df(
       check_sol300$U,
       weights = check_sol300$w,
       labels = check$row_partition,
@@ -308,7 +257,7 @@ plot_fit(
     )
   ) /
   plot_fit(
-    mat_df(
+    matrix_to_df(
       check_sol400$U,
       weights = check_sol400$w,
       labels = check$row_partition,
@@ -454,67 +403,6 @@ max(abs(diff(minima_curves[, 2]))) / 0.001 * max(abs(diff(minima_curves[, 3]))) 
 
 # Real Data
 
-```{r}
-plot_fit <- function(plot_df, title="") {
-  ggplot(plot_df, aes(x = order_col, y = order_row)) +
-    geom_raster(aes(fill = value)) +
-    annotate(
-      geom = "rect",
-      xmin = -max(plot_df$order_col) / 25,
-      xmax = 0,
-      ymin = plot_df$order_row - 0.5,
-      ymax = plot_df$order_row + 0.5,
-      fill = case_when(
-        plot_df$label == 1 ~ "green",
-        plot_df$label == 2 ~ "yellow",
-        plot_df$label == 3 ~ "purple",
-        plot_df$label == 4 ~ "grey",
-        plot_df$label == 5 ~ "orange",
-        plot_df$label == 6 ~ "blue",
-        plot_df$label == 7 ~ "red",
-        plot_df$label == 8 ~ "magenta",
-        plot_df$label == 9 ~ "pink",
-        TRUE ~ "black"
-      )
-    ) +
-    # annotate(
-    #   geom = "rect",
-    #   xmin = -2 * max(plot_df$order_col) / 25,
-    #   xmax = -max(plot_df$order_col) / 25,
-    #   ymin = plot_df$order_row - 0.5,
-    #   ymax = plot_df$order_row + 0.5,
-    #   fill = case_when(
-    #     plot_df$label2 == 1 ~ "green",
-    #     plot_df$label2 == 2 ~ "yellow",
-    #     plot_df$label2 == 3 ~ "purple",
-    #     plot_df$label2 == 4 ~ "grey",
-    #     plot_df$label2 == 5 ~ "orange",
-    #     plot_df$label2 == 6 ~ "blue",
-    #     plot_df$label2 == 7 ~ "red",
-    #     plot_df$label2 == 8 ~ "magenta",
-    #     plot_df$label2 == 9 ~ "pink",
-    #     TRUE ~ "black"
-    #   )
-    # ) +
-    scale_fill_gradient2() +
-    theme_minimal() +
-    theme(
-      axis.text.x = element_blank(),
-      axis.ticks.x = element_blank(),
-      axis.text.y = element_blank(),
-      axis.ticks.y = element_blank(),
-      axis.title.x = element_blank(),
-      axis.title.y = element_blank(),
-      plot.title = element_text(size=30)
-    ) +
-    guides(fill = "none") +
-    # xlab("Genes") +
-    # ylab("Samples") +
-    ggtitle(title)
-}
-
-```
-
 ## Leuk
 
 ```{r}
@@ -545,7 +433,7 @@ igraph::compare(cut_tree_leuk,
                 leuk_y$V1,
                 method="adjusted.rand")
 
-plot_fit(mat_df(leuk, leuk_y$V1), "Gene Expression Pattern of Leukemia Samples")
+plot_fit(matrix_to_df(leuk, leuk_y$V1), "Gene Expression Pattern of Leukemia Samples")
 ```
 
 ```{r}
@@ -555,7 +443,7 @@ igraph::compare(palm_leuk$row_clusters[[157]],
                 method="adjusted.rand")
 
 plot_fit(
-  mat_df(
+  matrix_to_df(
     palm_leuk$all_runs[[157]]$U,
     leuk_y$V1,
     weights = palm_leuk$all_runs[[157]]$w,
@@ -571,7 +459,7 @@ igraph::compare(sparsebc_leuk$Cs,
                 leuk_y$V1,
                 method="adjusted.rand")
 
-plot_fit(mat_df(sparsebc_leuk$mus,
+plot_fit(matrix_to_df(sparsebc_leuk$mus,
                 leuk_y$V1),
          "Biclustering of Leukemia Data (SparseBC)")
 ```
@@ -581,11 +469,11 @@ igraph::compare(cobra_leuk$groups_col[[39]]$cluster,
                 leuk_y$V1,
                 method="adjusted.rand")
 
-plot_fit(mat_df(t(cobra_leuk$U[[39]]),
+plot_fit(matrix_to_df(t(cobra_leuk$U[[39]]),
                 leuk_y$V1),
          "Biclustering of Leukemia Data (COBRA)")
 
-plot_fit(mat_df(t(cobra_leuk$U[[39]]),
+plot_fit(matrix_to_df(t(cobra_leuk$U[[39]]),
                 leuk_y$V1,
                 labels2 = cobra_leuk$groups_col[[39]]$cluster),
          "Biclustering of Leukemia Data (COBRA)")
@@ -623,7 +511,7 @@ igraph::compare(cut_tree_lym,
                 lym_y$V1,
                 method="adjusted.rand")
 
-plot_fit(mat_df(lym, lym_y$V1),
+plot_fit(matrix_to_df(lym, lym_y$V1),
          "Gene Expression Pattern of Lymphoma Samples")
 ```
 
@@ -633,7 +521,7 @@ igraph::compare(palm_lym$row_clusters[[86]],
                 method="adjusted.rand")
 
 plot_fit(
-  mat_df(
+  matrix_to_df(
     palm_lym$all_runs[[86]]$U,
     labels = lym_y$V1,
     cluster_with_weights = TRUE,
@@ -648,7 +536,7 @@ igraph::compare(cobra_lym$groups_col[[44]]$cluster,
                 lym_y$V1,
                 method="adjusted.rand")
 
-plot_fit(mat_df(t(cobra_lym$U[[44]]),
+plot_fit(matrix_to_df(t(cobra_lym$U[[44]]),
          lym_y$V1),
          "Biclustering of Lymphoma Data (COBRA)")
 ```
@@ -658,7 +546,7 @@ igraph::compare(sparsebc_lym$Cs,
                 lym_y$V1,
                 method="adjusted.rand")
 
-plot_fit(mat_df(
+plot_fit(matrix_to_df(
   sparsebc_lym$mus,
   lym_y$V1),
   "Biclustering of Lymphoma Data (SparseBC)")
