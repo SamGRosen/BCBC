@@ -7,42 +7,7 @@ datasets <- c(brain="brain", colon="colon", leuk="leukemia", srbct="srbct", lym=
 ```
 
 ```{r}
-metrics <- c("vi", "nmi", "split.join", "rand", "adjusted.rand")
 
-augment_cv <- function(rs_cobra, y_vals, columns=FALSE) {
-  for (metric in metrics) {
-    all_metric <- sapply(1:nrow(rs_cobra$cv_data), function(i) {
-      if(columns) {
-        clusters <- rs_cobra$col_clusters[[i]]
-      } else {
-        clusters <- rs_cobra$row_clusters[[i]]
-      }
-      if (length(unique(clusters)) == length(clusters)) {
-        return(-1)
-      }
-      igraph::compare(clusters, y_vals, method =
-                        metric)
-    })
-    rs_cobra$cv_data[[paste0(metric, "_", columns)]] <- all_metric
-  }
-  return(rs_cobra)
-}
-
-augment_cobra <- function(cobra, y_vals) {
-  num_trials <- length(cobra$validation_error)
-  for (metric in metrics) {
-    all_metric <-
-      sapply(1:num_trials, function(i) {
-        if (length(unique(cobra$groups_col[[i]]$cluster)) == length(cobra$groups_col[[i]]$cluster)) {
-          return(-1)
-        }
-        igraph::compare(cobra$groups_col[[i]]$cluster, y_vals, method =
-                          metric)
-      })
-    cobra[[metric]] <- all_metric
-  }
-  return(cobra)
-}
 ```
 
 ```{r}
