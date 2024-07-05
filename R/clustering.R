@@ -29,6 +29,15 @@ centroid_rows <- function(mat, mat_for_dist, threshold, calculate_centroids=TRUE
 }
 
 
+#' Title
+#'
+#' @param mat
+#' @param threshold
+#'
+#' @return
+#' @export
+#'
+#' @examples
 get_row_clusters <- function(mat, threshold) {
   clustering <- centroid_rows(mat, mat, threshold, calculate_centroids = FALSE)
 
@@ -36,6 +45,16 @@ get_row_clusters <- function(mat, threshold) {
 }
 
 
+#' Title
+#'
+#' @param bcbc_result
+#' @param percent_of_noise
+#' @param cluster_w_weights
+#'
+#' @return
+#' @export
+#'
+#' @examples
 thresholded_solution <- function(bcbc_result,
                                  percent_of_noise,
                                  cluster_w_weights = TRUE) {

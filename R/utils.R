@@ -1,5 +1,15 @@
 metrics <- c("vi", "nmi", "split.join", "rand", "adjusted.rand")
 
+#' Title
+#'
+#' @param cv_obj
+#' @param y_vals
+#' @param columns
+#'
+#' @return
+#' @export
+#'
+#' @examples
 augment_cv <- function(cv_obj, y_vals, columns=FALSE) {
   for (metric in metrics) {
     all_metric <- sapply(1:nrow(cv_obj$cv_data), function(i) {
@@ -20,6 +30,15 @@ augment_cv <- function(cv_obj, y_vals, columns=FALSE) {
 }
 
 
+#' Title
+#'
+#' @param cobra
+#' @param y_vals
+#'
+#' @return
+#' @export
+#'
+#' @examples
 augment_cobra <- function(cobra, y_vals) {
   num_trials <- length(cobra$validation_error)
   for (metric in metrics) {
@@ -37,6 +56,20 @@ augment_cobra <- function(cobra, y_vals) {
 }
 
 
+#' Title
+#'
+#' @param matrix
+#' @param labels
+#' @param labels2
+#' @param weights
+#' @param lambda
+#' @param filter_weight
+#' @param cluster_with_weights
+#'
+#' @return
+#' @export
+#'
+#' @examples
 matrix_fit_to_df <- function(matrix,
                              labels=NULL,
                              labels2=NULL,
@@ -91,6 +124,18 @@ matrix_fit_to_df <- function(matrix,
 }
 
 
+#' Title
+#'
+#' @param bcbc_result
+#' @param cluster_with_weights
+#' @param filter_weight
+#' @param labels
+#' @param labels2
+#'
+#' @return
+#' @export
+#'
+#' @examples
 bcbc_result_to_df <- function(bcbc_result,
                               cluster_with_weights = TRUE,
                               filter_weight = -Inf,
@@ -109,6 +154,20 @@ bcbc_result_to_df <- function(bcbc_result,
 }
 
 
+#' Title
+#'
+#' @param plot_df
+#' @param title
+#' @param xlabel
+#' @param ylabel
+#' @param fill_attr
+#' @param alpha_weight
+#' @param bin_scale
+#'
+#' @return
+#' @export
+#'
+#' @examples
 plot_fit <- function(plot_df,
                      title = "",
                      xlabel = "",

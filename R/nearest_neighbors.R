@@ -14,6 +14,19 @@ create_edge_incidence_edges <- function(P, n) {
   return(E)
 }
 
+#' Title
+#'
+#' @param X
+#' @param k_row
+#' @param k_col
+#' @param phi
+#' @param approx
+#' @param return_edges
+#'
+#' @return
+#' @export
+#'
+#' @examples
 fast_gkn_weights <- function(X,
                              k_row,
                              k_col,

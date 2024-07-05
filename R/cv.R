@@ -54,6 +54,27 @@ get_cv_metrics <- function(X,
 }
 
 
+#' Title
+#'
+#' @param X
+#' @param lambdas
+#' @param k_rows
+#' @param k_cols
+#' @param gammas
+#' @param tmaxs
+#' @param tmax_outers
+#' @param tmax_cobras
+#' @param phis
+#' @param recalculate_weights
+#' @param tols
+#' @param weighted_clusters
+#' @param percent_noise
+#' @param progress
+#'
+#' @return
+#' @export
+#'
+#' @examples
 cv.BCBC <- function(X,
                     lambdas = c(1),
                     k_rows = c(2),
@@ -127,10 +148,10 @@ melt_cv_data <- function(tuning_data) {
   # Makes a big df mostly for visualization
   num_runs <- nrow(tuning_data$cv_data)
   to_return <-
-    cbind(mat_df(tuning_data$all_runs[[1]]), tuning_data$cv_data[1, ])
+    cbind(matrix_fit_to_df(tuning_data$all_runs[[1]]), tuning_data$cv_data[1, ])
   for (i in 2:num_runs) {
     to_return <- rbind(to_return,
-                       cbind(mat_df(tuning_data$all_runs[[i]]), tuning_data$cv_data[i, ]))
+                       cbind(matrix_fit_to_df(tuning_data$all_runs[[i]]), tuning_data$cv_data[i, ]))
   }
   return(to_return)
 }

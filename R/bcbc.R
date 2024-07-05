@@ -1,4 +1,13 @@
-# From https://github.com/kharchenkolab/vrnmf/tree/main
+#' Orthogonal projection of a vector onto the simplex
+#'
+#' From https://github.com/kharchenkolab/vrnmf/tree/main
+#' @param unproj
+#' @param bound
+#'
+#' @return
+#' @export
+#'
+#' @examples
 projection_onto_simplex <- function(unproj, bound=1) {
   q <- sort(unproj, decreasing = TRUE, method = "quick")
   qcum <- cumsum(q)
@@ -29,6 +38,28 @@ calc_fusion_term <- function(edges, weights, U, rows=TRUE) {
 }
 
 
+#' Title
+#'
+#' @param X
+#' @param lambda
+#' @param k_row
+#' @param k_col
+#' @param gamma
+#' @param phi
+#' @param tmax
+#' @param tmax_cobra
+#' @param tmax_outer
+#' @param tol
+#' @param recalculate_weights
+#' @param approx
+#' @param threshold
+#' @param scale_gamma
+#' @param progress
+#'
+#' @return
+#' @export
+#'
+#' @examples
 BCBC <- function(X,
                  lambda,
                  k_row = 4,
