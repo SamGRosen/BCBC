@@ -7,6 +7,7 @@ metrics <- c("vi", "nmi", "split.join", "rand", "adjusted.rand")
 #' @param columns
 #'
 #' @return
+#' @importFrom igraph compare
 #' @export
 #'
 #' @examples
@@ -36,6 +37,7 @@ augment_cv <- function(cv_obj, y_vals, columns=FALSE) {
 #' @param y_vals
 #'
 #' @return
+#' @importFrom igraph compare
 #' @export
 #'
 #' @examples
@@ -67,6 +69,12 @@ augment_cobra <- function(cobra, y_vals) {
 #' @param cluster_with_weights
 #'
 #' @return
+#' @importFrom dplyr mutate
+#' @importFrom dplyr row_number
+#' @importFrom dplyr inner_join
+#' @importFrom dplyr distinct
+#' @importFrom tidyr pivot_longer
+#' @import stringr
 #' @export
 #'
 #' @examples
@@ -165,6 +173,7 @@ bcbc_result_to_df <- function(bcbc_result,
 #' @param bin_scale
 #'
 #' @return
+#' @import ggplot2
 #' @export
 #'
 #' @examples

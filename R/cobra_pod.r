@@ -14,7 +14,7 @@
 #' @param tol Stopping criterion
 #' @param max_iter_inner Maximum number of inner cobra iterations
 #' @param tol_inner Stopping criterion for inner cobra loop
-#' @useDynLib cvxbiclustr
+#' @useDynLib BCBC
 #' @export
 #' @examples
 #' ## Create bicluster path
@@ -140,7 +140,7 @@ cobra_pod <- function(X, Lambda_row, Lambda_col, E_row, E_col, w_row, w_col, The
   #                                    double *mm_loss,
   #                                    int *max_iter, int *iter, double *tol,
   #                                    int *max_iter_inner, double *tol_inner) {
-  sol <- .C('test_convex_bicluster_impute',MT=XT,UT=UT,
+  sol <- .C(getNativeSymbolInfo('test_convex_bicluster_impute'),MT=XT,UT=UT,
             LambdaT_row=LambdaT_row,
             LambdaT_col=LambdaT_col,
             VT_row=VT_row,VT_col=VT_col,

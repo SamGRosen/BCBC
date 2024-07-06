@@ -70,8 +70,10 @@ get_cv_metrics <- function(X,
 #' @param weighted_clusters
 #' @param percent_noise
 #' @param progress
+#' @param ... passed to BCBC
 #'
 #' @return
+#' @import future.apply
 #' @export
 #'
 #' @examples
@@ -88,7 +90,7 @@ cv.BCBC <- function(X,
                     tols = c(1e-6),
                     weighted_clusters = TRUE,
                     percent_noise = c(0.1),
-                    progress = FALSE) {
+                    ...) {
 
   all_params <-
     expand.grid(
@@ -116,8 +118,8 @@ cv.BCBC <- function(X,
     future.seed = TRUE,
     function(param_set) {
       params <- all_params[param_set,]
-      result <- do.call(model,
-                        c(list(X=X, progress=progress), params))
+      result <- do.call(BCBC,
+                        c(list(X=X), params, ...))
 
       cv_metrics <- get_cv_metrics(X,
                                    result,

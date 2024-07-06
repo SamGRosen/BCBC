@@ -35,6 +35,7 @@ centroid_rows <- function(mat, mat_for_dist, threshold, calculate_centroids=TRUE
 #' @param threshold
 #'
 #' @return
+#' @import dbscan
 #' @export
 #'
 #' @examples

@@ -100,7 +100,7 @@ BCBC <- function(X,
 
   start <- Sys.time()
   for (t in 1:tmax_outer) {
-    if(scale_by_weights) {
+    if(scale_gamma) {
       L_w = max(w^2 + lambda * w)
       gamma = base_gamma / L_w
       U_step = U - sweep(X - U, 2, w ^ 2 + lambda * w, "*") / L_w
@@ -172,7 +172,7 @@ BCBC <- function(X,
   if (progress) {
     close(pb)
   }
-
+  print("done")
   return(
     list(
       U = U,

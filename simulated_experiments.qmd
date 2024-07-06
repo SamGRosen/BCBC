@@ -1,49 +1,17 @@
 ```{r}
-source("./RSCobra.R")
 library(dynamicTreeCut)
 library(sparseBC)
 library(s4vd)
 library(biclust)
 library(SCBiclust)
 # https://github.com/yanzhong07/BCEL/tree/master/BCEL/R
+
+plan(sequential, split=TRUE)
 ```
 
 # Helper Functions
 
 ```{r}
-matrix_to_df <- function(matrix) {
-  df <- as.data.frame(matrix) |>
-    mutate(row_num = row_number()) |>
-    pivot_longer(!row_num, names_to = "col_num") |>
-    mutate(col_num = as.numeric(str_replace(col_num, "V", "")))
-
-  row_dist <- dist(matrix)
-  col_dist <- dist(t(matrix))
-  
-  h_row <- hclust(row_dist)
-  h_col <- hclust(col_dist)
-  df <- df |>
-    inner_join(tibble(
-      row_num = h_row$order,
-      order_row = 1:length(h_row$order)
-    )) |>
-    inner_join(tibble(
-      col_num = h_col$order,
-      order_col = 1:length(h_col$order)
-    ))
-
-  df
-}
-
-plot_matrix_simple <- function(as_df) {
-  ggplot(as_df, aes(x = order_col, y = order_row)) +
-    geom_raster(aes(fill = value)) +
-    scale_fill_gradient2() +
-    theme_minimal() +
-    theme(axis.text.x = element_blank(),
-          axis.ticks.x = element_blank())
-}
-
 metrics <- c("vi", "nmi", "split.join", "rand", "adjusted.rand")
 
 evaluate_checker <- function(checker, fitted_mat, row_groups, col_groups) {
@@ -103,17 +71,18 @@ for(noise_level in noise_levels) {
 ```{r}
 
 all_palm_results = list()
-for(checker in 1:length(all_checkers)) {
+for(checker in 1:1) {
   print(checker)
   all_palm_results[[checker]] <-
-    tune_bcbc(
+    cv.BCBC(
       all_checkers[[checker]]$X,
-      palm,
-      lambdas = 2 ^ seq(-8,-4, 1),
-      gammas = 2 ^ seq(6, 12, 1),
-      progress = TRUE
+      lambdas = 2 ^ seq(-6,-4, 1),
+      gammas = 2 ^ seq(0, 6, 1),
+      progress = TRUE,
+      scale_gamma = TRUE,
+      recalculate_weights = TRUE
     )
-  }
+}
 
 ```
 

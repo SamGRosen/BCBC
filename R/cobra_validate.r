@@ -94,7 +94,7 @@ get_validation <- function(p,n,fraction=0.1,seed=12345) {
 #' @param tol Stopping criterion
 #' @param max_iter_inner Maximum number of inner cobra iterations
 #' @param tol_inner Stopping criterion for inner cobra loop
-#' @useDynLib cvxbiclustr
+#' @useDynLib BCBC
 #' @export
 #' @examples
 #' ## Create bicluster path

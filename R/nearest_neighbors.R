@@ -24,6 +24,8 @@ create_edge_incidence_edges <- function(P, n) {
 #' @param return_edges
 #'
 #' @return
+#' @importFrom dbscan kNN
+#' @import Matrix
 #' @export
 #'
 #' @examples

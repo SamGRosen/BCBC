@@ -12,7 +12,7 @@
 #' @param gamma Regularization parameter for shrinkage
 #' @param max_iter Maximum number of AMA iterations
 #' @param tol stopping tolerance
-#' @useDynLib cvxbiclustr
+#' @useDynLib BCBC
 cobra_internal <- function(X, Lambda_row,Lambda_col,E_row,E_col,w_row,w_col,gamma,
                            max_iter=1e2, tol=1e-3) {
   ## Get matrix dimensions

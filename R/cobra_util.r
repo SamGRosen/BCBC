@@ -149,7 +149,7 @@ knn_weights <- function(w,k,n) {
 #' }, where the lth pair of nodes is (\code{i},\code{j}).
 #' @param X The data matrix to be clustered. The rows are the features, and the columns are the samples.
 #' @param phi The nonnegative parameter that controls the scale of kernel weights
-#' @useDynLib cvxbiclustr
+#' @useDynLib BCBC
 #' @return A vector \cite{w} of weights for convex clustering.
 kernel_weights <- function(X,phi=1) {
   storage.mode(X) <- "double"
