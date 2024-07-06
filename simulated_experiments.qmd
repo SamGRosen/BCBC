@@ -1,4 +1,6 @@
 ```{r}
+library(tidyverse)
+library(BCBC)
 library(dynamicTreeCut)
 library(sparseBC)
 library(s4vd)
@@ -15,8 +17,10 @@ plan(sequential, split=TRUE)
 metrics <- c("vi", "nmi", "split.join", "rand", "adjusted.rand")
 
 evaluate_checker <- function(checker, fitted_mat, row_groups, col_groups) {
-  to_return = list()
-  
+  to_return <- list()
+  to_return$row_group_count <- length(unique(row_groups))
+  to_return$col_group_count <- length(unique(col_groups))
+
   for (metric in metrics) {
     to_return[[paste(metric, "row", sep = "_")]] <-
       igraph::compare(row_groups,
@@ -34,6 +38,30 @@ evaluate_checker <- function(checker, fitted_mat, row_groups, col_groups) {
   }
   to_return
 }
+
+get_all_checker_results <- function(all_checkers, all_results, extractor) {
+  all_info <- NULL
+  for(run in 1:length(all_checkers)) {
+    evaluated_info <- do.call(evaluate_checker,
+                              c(list(checker = all_checkers[[run]]), extractor(all_results[[run]])))
+    new_row <- as_tibble_row(
+      c(evaluated_info,
+        noise_level = all_checkers[[run]]$noise_level,
+        trial = all_checkers[[run]]$trial,
+        extra_dim = all_checkers[[run]]$extra_dim,
+        true_row_num = length(unique(all_checkers[[run]]$row_partition)),
+        true_col_num = length(unique(all_checkers[[run]]$col_partition))
+      )
+    )
+    if(is.null(all_info)) {
+      all_info <- new_row
+    } else {
+      all_info <- all_info |> add_row(new_row)
+    }
+  }
+  
+  return(all_info)
+}
 ```
 
 # Data
@@ -42,25 +70,29 @@ evaluate_checker <- function(checker, fitted_mat, row_groups, col_groups) {
 
 all_checkers <- list()
 
-noise_levels <- c(0.5, 1, 1.5, 2)
+trials <- 2
+noise_levels <- c(1)
 extra_dims <- c(0, 100, 250, 500, 1000)
 
 i <- 1
-for(noise_level in noise_levels) {
-  for (extra_dim in extra_dims) {
-    all_checkers[[i]] <- gen_checkerboard(
-      200,
-      200,
-      6,
-      6,
-      noise = noise_level,
-      p_extra = extra_dim,
-      prob_empty = 0.25
-    )
-    all_checkers[[i]]$noise_level = noise_level
-    all_checkers[[i]]$extra_dim = extra_dim
-    
-    i <- i + 1
+for(trial in 1:trials) {
+  for (noise_level in noise_levels) {
+    for (extra_dim in extra_dims) {
+      all_checkers[[i]] <- gen_checkerboard(
+        100,
+        100,
+        5,
+        5,
+        noise = noise_level,
+        p_extra = extra_dim,
+        prob_empty = 0.25
+      )
+      all_checkers[[i]]$noise_level = noise_level
+      all_checkers[[i]]$extra_dim = extra_dim
+      all_checkers[[i]]$trial = trial
+
+      i <- i + 1
+    }
   }
 }
 
@@ -71,17 +103,36 @@ for(noise_level in noise_levels) {
 ```{r}
 
 all_palm_results = list()
-for(checker in 1:1) {
+for(checker in 1:length(all_checkers)) {
   print(checker)
   all_palm_results[[checker]] <-
     cv.BCBC(
       all_checkers[[checker]]$X,
-      lambdas = 2 ^ seq(-6,-4, 1),
-      gammas = 2 ^ seq(0, 6, 1),
-      progress = TRUE,
+      lambdas = 2 ^ seq(-5,-4, 1),
+      gammas = 2 ^ seq(1, 6, 2),
+      progress = FALSE,
       scale_gamma = TRUE,
-      recalculate_weights = TRUE
+      recalculate_weights = TRUE,
+      tol=1e-4
     )
+}
+
+evaluate_checker(
+  all_checkers[[1]],
+  all_palm_results[[1]]$all_runs[[5]]$U,
+  all_palm_results[[1]]$row_clusters[[5]],
+  all_palm_results[[1]]$col_clusters[[5]]
+)
+
+```
+
+
+```{r}
+
+
+for(checker in 1:length(all_checkers)) {
+  
+  
 }
 
 ```
@@ -164,24 +215,14 @@ for(checker in 1:length(all_checkers)) {
 ```{r}
 
 run_sparsebc <- function(X, gammas) {
-  kr <-
-    sparseBC.choosekr(
-      X,
-      k = 1:10,
-      r = 1:10,
-      lambda = 0,
-      percent = 0.125,
-      TRUE
-    )
-
   lambda <- sparseBC.BIC(X,
-                         kr$estimated_kr[1, 1],
-                         kr$estimated_kr[1, 2],
+                         5,
+                         5,
                          gammas)
   
   sparsebc_fit <- sparseBC(X,
-                           kr$estimated_kr[1, 1],
-                           kr$estimated_kr[1, 2],
+                           5,
+                           5,
                            lambda$lambda)
   sparsebc_fit
 }
@@ -189,8 +230,20 @@ run_sparsebc <- function(X, gammas) {
 all_sparsebc_results = list()
 for(checker in 1:length(all_checkers)) {
   all_sparsebc_results[[checker]] <-
-    run_sparsebc(all_checkers[[checker]]$X, gammas = gammas=2^seq(-2, 10, 1))
+    run_sparsebc(all_checkers[[checker]]$X, gammas=2^seq(-2, 10, 1))
 }
+
+sparseBC_extractor <- function(sparseBC_run) {
+  list(
+    row_groups = sparseBC_run$Cs,
+    col_groups = sparseBC_run$Ds,
+    fitted_mat = NULL
+  )
+}
+
+test <- get_all_checker_results(all_checkers, all_sparsebc_results, sparseBC_extractor)
+
+
 
 ```
 
