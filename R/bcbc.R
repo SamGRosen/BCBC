@@ -73,7 +73,7 @@ BCBC <- function(X,
                  recalculate_weights = TRUE,
                  approx = 0,
                  threshold = 0,
-                 scale_gamma = FALSE,
+                 scale_gamma = TRUE,
                  progress = TRUE) {
   base_gamma <- gamma
   n <- dim(X)[1]
@@ -101,11 +101,11 @@ BCBC <- function(X,
   start <- Sys.time()
   for (t in 1:tmax_outer) {
     if(scale_gamma) {
-      L_w = max(w^2 + lambda * w)
-      gamma = base_gamma / L_w
-      U_step = U - sweep(X - U, 2, w ^ 2 + lambda * w, "*") / L_w
+      step_size <- sqrt(max(w^2 + lambda * w))
+      gamma <- base_gamma / step_size
+      U_step <- U - sweep(X - U, 2, w ^ 2 + lambda * w, "*") / step_size
     } else {
-      U_step = U - sweep(X - U, 2, w ^ 2 + lambda * w, "*")
+      U_step <- U - sweep(X - U, 2, w ^ 2 + lambda * w, "*")
     }
 
     if (recalculate_weights || t == 1) {
@@ -172,7 +172,6 @@ BCBC <- function(X,
   if (progress) {
     close(pb)
   }
-  print("done")
   return(
     list(
       U = U,
