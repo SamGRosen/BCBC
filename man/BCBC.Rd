@@ -18,7 +18,7 @@ BCBC(
   recalculate_weights = TRUE,
   approx = 0,
   threshold = 0,
-  scale_gamma = FALSE,
+  scale_gamma = TRUE,
   progress = TRUE
 )
 }

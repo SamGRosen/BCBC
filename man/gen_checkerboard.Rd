@@ -11,6 +11,7 @@ gen_checkerboard(
   num_col_clusters,
   p_extra = 0,
   noise = 1,
+  cluster_spread = 5,
   prob_empty = 0.1,
   shuffle = TRUE,
   scale = TRUE

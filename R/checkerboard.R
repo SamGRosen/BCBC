@@ -20,6 +20,7 @@ gen_checkerboard <- function(n,
                              num_col_clusters,
                              p_extra = 0,
                              noise = 1,
+                             cluster_spread = 5,
                              prob_empty = 0.1,
                              shuffle = TRUE,
                              scale = TRUE) {
@@ -28,7 +29,7 @@ gen_checkerboard <- function(n,
     sort(sample(1:num_col_clusters, p, replace = TRUE))
 
   mu_kr <- matrix(
-    runif(num_row_clusters * num_col_clusters,-2, 2),
+    runif(num_row_clusters * num_col_clusters, -cluster_spread, cluster_spread),
     nrow = num_row_clusters,
     ncol = num_col_clusters
   )
@@ -50,11 +51,14 @@ gen_checkerboard <- function(n,
       centers[i, j] <- mu_kr[row_partition[i], col_partition[j]]
     }
   }
+
+  true_features = rep(1, p)
   if (p_extra > 0) {
     data_mat[, (p + 1):(p + p_extra)] <-
       rnorm(n * p_extra, mean = 0, sd = noise)
     centers[, (p + 1):(p + p_extra)] <- 0
     col_partition <- c(col_partition, rep(num_col_clusters + 1, p_extra))
+    true_features <- c(true_features, rep(0, p_extra))
   }
 
   if (shuffle) {
@@ -66,6 +70,7 @@ gen_checkerboard <- function(n,
     shuffled_center <- centers[row_reorder,]
     row_partition <- row_partition[row_reorder]
     col_partition <- col_partition[col_reorder]
+    true_features <- true_features[col_reorder]
     if(scale) {
       shuffled_row <- scale(shuffled_row)
       shuffled_center <- scale(shuffled_center,
@@ -75,7 +80,7 @@ gen_checkerboard <- function(n,
     }
     return(list(X = shuffled_row, centers = shuffled_center,
                 row_partition=row_partition, col_partition=col_partition,
-                zeroed=zeroed))
+                zeroed=zeroed, true_features=true_features))
   }
   if(scale) {
     data_mat <- scale(data_mat)
@@ -87,5 +92,5 @@ gen_checkerboard <- function(n,
   }
   return(list(X = data_mat, centers = centers,
               row_partition=row_partition, col_partition=col_partition,
-              zeroed=zeroed))
+              zeroed=zeroed, true_features))
 }
