@@ -11,7 +11,6 @@ library(future.apply)
 # install.packages("../BCEL", repos = NULL, type="source")
 library(BCEL)  # https://github.com/SamGRosen/BCEL/tree/master/BCEL/R, need to compile from source
 
-
 plan(sequential, split=TRUE)
 ```
 
@@ -111,12 +110,13 @@ get_all_checker_results <- function(all_checkers, all_results, extractor) {
 # Data
 
 ```{r}
-
+set.seed(2024)
+SAVE_RESULTS = TRUE
 all_checkers <- list()
 
-trials <- 1
-noise_levels <- c(1)
-extra_dims <- c(0, 5, 10, 100)
+trials <- 20
+noise_levels <- c(3)
+extra_dims <- c(0, 50, 100, 250, 500, 1000)
 
 i <- 1
 for(trial in 1:trials) {
@@ -124,10 +124,11 @@ for(trial in 1:trials) {
     for (extra_dim in extra_dims) {
       all_checkers[[i]] <- gen_checkerboard(
         100,
-        50,
+        100,
         5,
         5,
         noise = noise_level,
+        cluster_spread = 10,
         p_extra = extra_dim,
         prob_empty = 0
       )
@@ -170,12 +171,24 @@ for(checker in 1:length(all_checkers)) {
   break
 }
 
+if(SAVE_RESULTS) {
+  saveRDS(all_bcbc_results, paste0("./rds_files/all_bcbc_results", Sys.time(), ".RDS"))
+}
+
 bcbc_results <- get_all_checker_results(all_checkers, all_bcbc_results, bcbc_extractor)
 ```
 
 # Cobra
 
 ```{r}
+cobra_extractor <- function(cobra_result) {
+  best_result <- which.min(cobra_result$validation_error)
+  list(
+    col_groups = cobra_result$groups_row[[best_result]]$cluster,
+    row_groups = cobra_result$groups_col[[best_result]]$cluster,
+    fitted_mat = t(cobra_result$U[[best_result]])
+  )
+}
 
 all_cobra_results = list()
 for(checker in 1:length(all_checkers)) {
@@ -199,13 +212,8 @@ for(checker in 1:length(all_checkers)) {
     )
 }
 
-cobra_extractor <- function(cobra_result) {
-  best_result <- which.min(cobra_result$validation_error)
-  list(
-    col_groups = cobra_result$groups_row[[best_result]]$cluster,
-    row_groups = cobra_result$groups_col[[best_result]]$cluster,
-    fitted_mat = t(cobra_result$U[[best_result]])
-  )
+if(SAVE_RESULTS) {
+  saveRDS(all_cobra_results, paste0("./rds_files/all_cobra_results", Sys.time(), ".RDS"))
 }
 
 cobra_results <- get_all_checker_results(all_checkers, all_cobra_results, cobra_extractor)
@@ -229,7 +237,10 @@ for(checker in 1:length(all_checkers)) {
     )
 }
 
-all_bcel_results <- get_all_checker_results(all_checkers, all_bcel_results, bcel_extractor)
+if(SAVE_RESULTS) {
+  saveRDS(all_bcel_results, paste0("./rds_files/all_bcel_results", Sys.time(), ".RDS"))
+}
+bcel_results <- get_all_checker_results(all_checkers, all_bcel_results, bcel_extractor)
 ```
 
 # S4VD
@@ -255,6 +266,10 @@ for(checker in 1:length(all_checkers)) {
       merr = 1e-4,
       ss.thr = c(0, 1)
     )
+}
+
+if(SAVE_RESULTS) {
+  saveRDS(all_s4vd_results, paste0("./rds_files/all_s4vd_results", Sys.time(), ".RDS"))
 }
 
 s4vd_results <- get_all_checker_results(all_checkers, all_s4vd_results, biclust_extractor)
@@ -291,6 +306,10 @@ for(checker in 1:length(all_checkers)) {
   break
 }
 
+if(SAVE_RESULTS) {
+  saveRDS(all_sparsebc_results, paste0("./rds_files/all_sparsebc_results", Sys.time(), ".RDS"))
+}
+
 sparsebc_results <- get_all_checker_results(all_checkers, all_sparsebc_results, sparseBC_extractor)
 ```
 
@@ -310,6 +329,10 @@ for(checker in 1:length(all_checkers)) {
                               sc = FALSE,
                               silent = TRUE,
                               maxnum.bicluster = 5)
+}
+
+if(SAVE_RESULTS) {
+  saveRDS(all_scbiclust_results, paste0("./rds_files/all_scbiclust_results", Sys.time(), ".RDS"))
 }
 
 scbiclust_results <- get_all_checker_results(all_checkers, all_scbiclust_results, scbiclust_extractor)
@@ -335,9 +358,12 @@ for (checker in 1:length(all_checkers)) {
     )
 }
 
+if(SAVE_RESULTS) {
+  saveRDS(all_bcplaid_results, paste0("./rds_files/all_bcplaid_results", Sys.time(), ".RDS"))
+}
+
 plaid_results <- get_all_checker_results(all_checkers, all_bcplaid_results, biclust_extractor)
 ```
-
 
 # DCT
 
@@ -362,6 +388,10 @@ for(checker in 1:length(all_checkers)) {
     col_groups = cut_tree_check_col,
     fitted_mat = NULL
   )
+}
+
+if(SAVE_RESULTS) {
+  saveRDS(all_dct_results, paste0("./rds_files/all_dct_results", Sys.time(), ".RDS"))
 }
 
 all_dct_results <- get_all_checker_results(all_checkers, all_dct_results, identity)
