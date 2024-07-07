@@ -64,7 +64,7 @@ thresholded_solution <- function(bcbc_result,
   U <- bcbc_result$U
   lambda <- bcbc_result$lambda
   if (cluster_w_weights) {
-    w_vals <- sqrt(w + lambda * w)
+    w_vals <- sqrt(w^2 + lambda * w)
     solution_mat <- sweep(U, 2, w_vals, "*")
   } else {
     solution_mat <- U
