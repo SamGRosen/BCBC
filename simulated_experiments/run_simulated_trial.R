@@ -1,0 +1,108 @@
+library(tidyverse)
+library(BCBC)
+library(future.apply)
+
+args <- commandArgs(trailingOnly = TRUE)
+
+print(args)
+
+stopifnot(length(args) == 3)
+
+JOB_ID <- args[1]
+ARRAY_ID <- as.integer(args[2])
+METHOD <- args[3]
+
+plan(sequential, split=TRUE)
+
+set.seed(2024)
+all_checkers <- list()
+
+trials <- 20
+noise_levels <- c(3)
+extra_dims <- c(0, 50, 100, 250, 500, 1000)
+
+i <- 1
+for(trial in 1:trials) {
+  for (noise_level in noise_levels) {
+    for (extra_dim in extra_dims) {
+      all_checkers[[i]] <- gen_checkerboard(
+        100,
+        100,
+        5,
+        5,
+        noise = noise_level,
+        cluster_spread = 10,
+        p_extra = extra_dim,
+        prob_empty = 0
+      )
+      all_checkers[[i]]$noise_level = noise_level
+      all_checkers[[i]]$extra_dim = extra_dim
+      all_checkers[[i]]$trial = trial
+      i <- i + 1
+    }
+  }
+}
+
+matched_algo <- match(toupper(METHOD), c("ADAPTIVE_BCBC", "BCBC", "BCEL", "COBRA"))
+
+if(matched_algo == 1) {
+  result <- cv.BCBC(
+    all_checkers[[ARRAY_ID]]$X,
+    lambdas = 2 ^ seq(-8,-4, 1),
+    gammas = 2 ^ seq(1, 12, 2),
+    progress = TRUE,
+    scale_gamma = TRUE,
+    recalculate_weights = TRUE,
+    tol=1e-4,
+    percent_noise = 0.25
+  )
+} else if(matched_algo == 2) {
+  result <- cv.BCBC(
+    all_checkers[[ARRAY_ID]]$X,
+    lambdas = 2 ^ seq(-8,-4, 1),
+    gammas = 2 ^ seq(1, 12, 2),
+    progress = TRUE,
+    scale_gamma = TRUE,
+    recalculate_weights = FALSE,
+    tol=1e-4,
+    percent_noise = 0.25
+  )
+} else if(matched_algo == 3) {
+  library(BCEL)
+  result <-
+    bcel_stable(
+      all_checkers[[ARRAY_ID]]$X,
+      r = 5
+    )
+} else if(matched_algo == 4) {
+  wts <- fast_gkn_weights(
+    t(all_checkers[[ARRAY_ID]]$X),
+    k_row = 2,
+    k_col = 2,
+    phi = 0.5,
+    approx = 0
+  )
+
+  result <-
+    cobra_validate(
+      t(all_checkers[[ARRAY_ID]]$X),
+      wts$E_row,
+      wts$E_col,
+      wts$w_row,
+      wts$w_col,
+      gamma = 2 ^ seq(3, 16, 0.25),
+      max_iter = 500
+    )
+} else {
+  stop(c("Invalid args:", args))
+}
+
+saveRDS(result, paste0(
+  "/cwork/sgr26/",
+  toupper(METHOD),
+  "_",
+  JOB_ID,
+  "_",
+  ARRAY_ID,".RDS")
+)
+

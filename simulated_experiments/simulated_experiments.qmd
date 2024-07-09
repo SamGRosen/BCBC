@@ -1,0 +1,261 @@
+```{r}
+library(tidyverse)
+library(BCBC)
+library(dynamicTreeCut)
+library(sparseBC)
+library(s4vd)
+library(biclust)
+library(SCBiclust)
+library(future.apply)
+
+# install.packages("../BCEL", repos = NULL, type="source")
+library(BCEL)  # https://github.com/SamGRosen/BCEL, need to compile from source
+
+plan(sequential, split=TRUE)
+```
+
+# Data
+
+```{r}
+set.seed(2024)
+SAVE_RESULTS = TRUE
+all_checkers <- list()
+
+trials <- 20
+noise_levels <- c(3)
+extra_dims <- c(0, 50, 100, 250, 500, 1000)
+
+i <- 1
+for(trial in 1:trials) {
+  for (noise_level in noise_levels) {
+    for (extra_dim in extra_dims) {
+      all_checkers[[i]] <- gen_checkerboard(
+        100,
+        100,
+        5,
+        5,
+        noise = noise_level,
+        cluster_spread = 10,
+        p_extra = extra_dim,
+        prob_empty = 0
+      )
+      all_checkers[[i]]$noise_level = noise_level
+      all_checkers[[i]]$extra_dim = extra_dim
+      all_checkers[[i]]$trial = trial
+      i <- i + 1
+    }
+  }
+}
+
+```
+
+# BiCobra
+
+```{r}
+all_bcbc_results = list()
+for(checker in 1:length(all_checkers)) {
+  print(c(checker, as.character(Sys.time())))
+  all_bcbc_results[[checker]] <-
+    cv.BCBC(
+      all_checkers[[checker]]$X,
+      lambdas = 2 ^ seq(-8,-4, 1),
+      gammas = 2 ^ seq(1, 12, 2),
+      progress = FALSE,
+      scale_gamma = TRUE,
+      recalculate_weights = TRUE,
+      tol=1e-4,
+      percent_noise = 0.25
+    )
+}
+
+if(SAVE_RESULTS) {
+  saveRDS(all_bcbc_results, paste0("./rds_files/all_bcbc_results", Sys.time(), ".RDS"))
+}
+```
+
+# Cobra
+
+```{r}
+all_cobra_results = list()
+for(checker in 1:length(all_checkers)) {
+  print(c(checker, as.character(Sys.time())))
+  wts <- fast_gkn_weights(
+    t(all_checkers[[checker]]$X),
+    k_row = 2,
+    k_col = 2,
+    phi = 0.5,
+    approx = 0
+  )
+  
+  all_cobra_results[[checker]] <-
+    cobra_validate(
+      t(all_checkers[[checker]]$X),
+      wts$E_row,
+      wts$E_col,
+      wts$w_row,
+      wts$w_col,
+      gamma = 2 ^ seq(3, 16, 0.25),
+      max_iter = 500
+    )
+}
+
+if(SAVE_RESULTS) {
+  saveRDS(all_cobra_results, paste0("./rds_files/all_cobra_results", Sys.time(), ".RDS"))
+}
+```
+
+# BCEL
+
+```{r}
+all_bcel_results = list()
+for(checker in 1:length(all_checkers)) {
+  print(c(checker, as.character(Sys.time())))
+
+  all_bcel_results[[checker]] <-
+    bcel_stable(
+      all_checkers[[checker]]$X,
+      r = 5
+    )
+  break
+}
+
+if(SAVE_RESULTS) {
+  saveRDS(all_bcel_results, paste0("./rds_files/all_bcel_results", Sys.time(), ".RDS"))
+}
+```
+
+# S4VD
+
+```{r}
+all_s4vd_results = list()
+for(checker in 1:length(all_checkers)) {
+  print(c(checker, as.character(Sys.time())))
+
+  all_s4vd_results[[checker]] <-
+    biclust(
+      all_checkers[[checker]]$X,
+      method = s4vd::BCs4vd(),
+      row.overlap = FALSE,
+      col.overlap = FALSE,
+      pcerv = 1,
+      pceru = 1,
+      nbiclust = 25,
+      iter = 1000,
+      gamm = 1,
+      merr = 1e-4,
+      ss.thr = c(0, 1)
+    )
+}
+
+if(SAVE_RESULTS) {
+  saveRDS(all_s4vd_results, paste0("./rds_files/all_s4vd_results", Sys.time(), ".RDS"))
+}
+```
+
+# SparseBC
+
+```{r}
+run_sparsebc <- function(X, gammas) {
+  lambda <- sparseBC.BIC(X,
+                         5,
+                         5,
+                         gammas)
+  
+  sparsebc_fit <- sparseBC(X,
+                           5,
+                           5,
+                           lambda$lambda)
+  sparsebc_fit
+}
+
+all_sparsebc_results = list()
+for(checker in 1:length(all_checkers)) {
+  print(c(checker, as.character(Sys.time())))
+
+  all_sparsebc_results[[checker]] <-
+    run_sparsebc(all_checkers[[checker]]$X, gammas=2^seq(-2, 12, 1))
+}
+
+if(SAVE_RESULTS) {
+  saveRDS(all_sparsebc_results, paste0("./rds_files/all_sparsebc_results", Sys.time(), ".RDS"))
+}
+```
+
+# SCBiclust
+
+```{r}
+all_scbiclust_results = list()
+for(checker in 1:length(all_checkers)) {
+  print(c(checker, as.character(Sys.time())))
+
+  all_scbiclust_results[[checker]] <-
+    PermBiclust.sigclust_stop(all_checkers[[checker]]$X,
+                              sc = FALSE,
+                              silent = TRUE,
+                              maxnum.bicluster = 5)
+}
+
+if(SAVE_RESULTS) {
+  saveRDS(all_scbiclust_results, paste0("./rds_files/all_scbiclust_results", Sys.time(), ".RDS"))
+}
+
+```
+
+# BCPlaid
+
+```{r}
+
+all_bcplaid_results = list()
+for (checker in 1:length(all_checkers)) {
+  print(c(checker, as.character(Sys.time())))
+
+  all_bcplaid_results[[checker]] <-
+    biclust(
+      all_checkers[[checker]]$X,
+      method = BCPlaid(),
+      background = FALSE,
+      max.layers = 25,
+      iter.layer = 100,
+      iter.startup = 100,
+      row.release = 0.7,
+      col.release = 0.7,
+      verbose = FALSE
+    )
+}
+
+if(SAVE_RESULTS) {
+  saveRDS(all_bcplaid_results, paste0("./rds_files/all_bcplaid_results", Sys.time(), ".RDS"))
+}
+```
+
+# DCT
+
+```{r}
+
+all_dct_results = list()
+for(checker in 1:length(all_checkers)) {
+  print(c(checker, as.character(Sys.time())))
+
+  checker_dist <- dist(all_checkers[[checker]]$X)
+  checker_dist_col <- dist(t(all_checkers[[checker]]$X))
+
+  cut_tree_check <-
+    cutreeDynamic(hclust(checker_dist),
+                  minClusterSize = 12,
+                  distM = as.matrix(checker_dist))
+  
+  cut_tree_check_col <-
+    cutreeDynamic(hclust(checker_dist_col),
+                  minClusterSize = 12,
+                  distM = as.matrix(checker_dist_col))
+  all_dct_results[[checker]] <- list(
+    row_groups = cut_tree_check,
+    col_groups = cut_tree_check_col,
+    fitted_mat = NULL
+  )
+}
+
+if(SAVE_RESULTS) {
+  saveRDS(all_dct_results, paste0("./rds_files/all_dct_results", Sys.time(), ".RDS"))
+}
+```

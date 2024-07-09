@@ -8,4 +8,4 @@ BCC.Rproj
 *.o
 *.so
 
-rds_files/
+**/rds_files/**
