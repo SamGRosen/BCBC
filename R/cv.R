@@ -10,9 +10,10 @@ get_cv_metrics <- function(X,
   swept <- sweep(U, 2, w ^ 2 + lambda * w, "*")
   rss <- sum(sweep(X - U, 2, w ^ 2 + lambda * w, "*") ^ 2)
   rss_no_lambda_sq <- sum(sweep(X - U, 2, w ^ 2, "*") ^ 2)
-  if (weighted_clusters) {  # TODO make sd calculate only using nonzero features
+  if (weighted_clusters) {
     row_sd <- sd(sqrt(rowSums(swept ^ 2)))
-    col_sd <- sd(sqrt(colSums(swept ^ 2)))
+    col_norms <- sqrt(colSums(swept ^ 2))
+    col_sd <- sd(col_norms[col_norms > 0])
     solution_mat <- swept
   } else {
     row_sd <- sd(sqrt(rowSums(U ^ 2)))

@@ -16,5 +16,5 @@ echo $SLURM_JOB_OD
 echo $SLURM_ARRAY_TASK_ID
 echo $METHOD
 
-Rscript /hpc/home/sgr26/BCBC/simulated_experiments/run_simulated_trial.R $SLURM_JOB_ID \
+Rscript /hpc/home/sgr26/BCBC/simulated_experiments/run_simulated_trial.R $SLURM_ARRAY_JOB_ID \
   $SLURM_ARRAY_TASK_ID $METHOD

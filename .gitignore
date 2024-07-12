@@ -7,5 +7,6 @@ BCC.Rproj
 
 *.o
 *.so
+*.out
 
 **/rds_files/**

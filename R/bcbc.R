@@ -122,6 +122,16 @@ BCBC <- function(X,
       E_col <- wts$E_col
       row_fusion <- wts$row_fusion
       col_fusion <- wts$col_fusion
+      if(min(w_row) <= 0 || min(w_col) <= 0) {
+        warning(paste(
+          "U has diverged, try increasing k_row, k_col or decreasing phi",
+          "arguments to encourage fusion terms.",
+          "Returning current step"))
+        rss_vals[t] <- sum(sweep(X - U, 2, w ^ 2 + lambda * w, "*") ^ 2)
+        objective_vals[t] <-
+          gamma * (row_fusion + col_fusion) + rss_vals[t] / 2
+        break
+      }
     } else {
       row_fusion <- calc_fusion_term(wts$unique_row_edges, wts$w_row, U, rows=FALSE)
       col_fusion <- calc_fusion_term(wts$unique_col_edges, wts$w_col, U, rows=TRUE)

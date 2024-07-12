@@ -193,9 +193,22 @@ cobra <- function(X,E_row,E_col,w_row,w_col,gamma,max_iter=1e2,tol=1e-3) {
   check_E_col <- ncol(E_col) == n
   check <- check_E_row && check_E_col
 
+  if ( !check )
+    stop(paste(
+        "Incidence matrix dimensions do not match input matrix",
+        ncol(E_row), n, p))
+
   ## Check weights vectors have correct length and are positive
   check_w_row <- (length(w_row) == m_row) && all(w_row > 0)
+  if ( !check_w_row ) {
+    stop(paste("Row weights invalid",
+               length(w_row), "?=", m_row, " or ", "min(w_row) =", min(w_row)))
+  }
   check_w_col <- (length(w_col) == m_col) && all(w_col > 0)
+  if ( !check_w_col ) {
+    stop(paste("Col weights invalid",
+               length(w_col), "?=", m_col, " or ", "0 <? min(w_col) =", min(w_col)))
+  }
   check <- check && check_w_row && check_w_col
 
   ## Check that m_row <= p*(p-1)/2 and m_col <= n*(n-1)/2
