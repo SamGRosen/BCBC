@@ -43,13 +43,16 @@ for(trial in 1:trials) {
   }
 }
 
-matched_algo <- match(toupper(METHOD), c("ADAPTIVE_BCBC", "BCBC", "BCBC_NO_SCALE", "BCEL", "COBRA"))
+matched_algo <- match(toupper(METHOD), c("ADAPTIVE_BCBC", "BCBC", "BCBC_NO_SCALE",
+                                         "BCBC_NO_SCALE_OR_ADAPT", "BCEL", "COBRA"))
 
 if(matched_algo == 1) {
   result <- cv.BCBC(
     all_checkers[[ARRAY_ID]]$X,
     lambdas = c(0, 2 ^ seq(-2, 6, 1)),
     gammas = 2 ^ seq(1, 10, 2),
+    k_rows = 4,
+    k_cols = 10,
     progress = TRUE,
     scale_gamma = TRUE,
     recalculate_weights = TRUE,
@@ -64,6 +67,8 @@ if(matched_algo == 1) {
     gammas = 2 ^ seq(1, 10, 2),
     progress = TRUE,
     scale_gamma = TRUE,
+    k_rows = 4,
+    k_cols = 10,
     recalculate_weights = FALSE,
     tol=1e-4,
     percent_noise = 0.1,
@@ -76,19 +81,39 @@ if(matched_algo == 1) {
     gammas = 2 ^ seq(4, 14, 2),
     progress = TRUE,
     scale_gamma = FALSE,
+    k_rows = 4,
+    k_cols = 10,
     recalculate_weights = TRUE,
     tol=1e-4,
-    percent_noise = 0.1,
-    phi=0.25
+    # percent_noise = 0.25,
+    phi=0.25,
+    num_row_clusters = 5,
+    num_col_clusters = 6
   )
 } else if(matched_algo == 4) {
+  result <- cv.BCBC(
+    all_checkers[[ARRAY_ID]]$X,
+    lambdas = 2 ^ seq(-6,-2, 1),
+    gammas = 2 ^ seq(4, 14, 2),
+    progress = TRUE,
+    scale_gamma = FALSE,
+    k_rows = 4,
+    k_cols = 10,
+    recalculate_weights = FALSE,
+    tol=1e-4,
+    # percent_noise = 0.25,
+    phi=0.25,
+    num_row_clusters = 5,
+    num_col_clusters = 6
+  )
+} else if(matched_algo == 5) {
   library(BCEL)
   result <-
     bcel_stable(
       all_checkers[[ARRAY_ID]]$X,
       r = 5
     )
-} else if(matched_algo == 5) {
+} else if(matched_algo == 6) {
   wts <- fast_gkn_weights(
     t(all_checkers[[ARRAY_ID]]$X),
     k_row = 2,

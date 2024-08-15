@@ -69,7 +69,7 @@ thresholded_solution <- function(bcbc_result,
   } else {
     solution_mat <- U
   }
-  row_sd <- sd(sqrt(rowSums(solution_mat ^ 2)))
+  row_sd <- sd(dist(solution_mat))
   threshold <- row_sd * percent_of_noise
   clustering <- centroid_rows(U, solution_mat, threshold)
   bcbc_result$U <- clustering$mat
@@ -81,4 +81,38 @@ thresholded_solution <- function(bcbc_result,
   to_return$U <- clustering$mat
 
   return(to_return)
+}
+
+
+#' Get radius to create k connected components in a nearest neighbor graph
+#'
+#' @param dist_mat
+#' @param k
+#' @param max_threshold
+#' @param maxiter
+#'
+#' @return
+#' @import dbscan
+#' @export
+#'
+#' @examples
+get_threshold_for_k_components <- function(dist_mat,
+                                           k,
+                                           max_threshold = sd(dist_mat),
+                                           maxiter = 25) {
+  get_num_components_err <- function(threshold) {
+    length(unique(dbscan::comps(frNN(
+      dist_mat, threshold, sort = F
+    )))) - k
+  }
+
+  if (get_num_components_err(max_threshold) >= 0) {
+    return(max_threshold)
+  }
+
+  root <- uniroot(get_num_components_err,
+                  c(0, max_threshold),
+                  maxiter = maxiter,
+                  tol = 1e-10)
+  root$root
 }

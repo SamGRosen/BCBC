@@ -54,6 +54,13 @@ all_results <- bind_rows(list(
     ),
     dct_extractor
   ),
+  threshold = get_all_checker_results(
+    all_checkers,
+    readRDS(
+      "~/BCBC/simulated_experiments/rds_files/all_threshold_results2024-07-18 22:28:20.912642.RDS"
+    ),
+    dct_extractor
+  ),
   s4vd = get_all_checker_results(
     all_checkers,
     readRDS(
@@ -83,9 +90,11 @@ all_results <- bind_rows(list(
     sparseBC_extractor
   ),
   cobra = read.csv("~/BCBC/simulated_experiments/rds_files/cobra2024-07-08.csv"),
-  bcel = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_NO_SCALE_12178995_.csv"),
-  bcbc = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_12119134.csv"),
-  adaptive_bcbc = read.csv("~/BCBC/simulated_experiments/rds_files/ADAPTIVE_BCBC_12173648_.csv")
+  bcel = read.csv("~/BCBC/simulated_experiments/rds_files/BCEL_.csv"),
+  bcbc_no_scale = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_NO_SCALE_12940399.csv"),
+  # bcbc = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_12413888.csv"),
+  # adaptive_bcbc = read.csv("~/BCBC/simulated_experiments/rds_files/ADAPTIVE_BCBC_12413887.csv"),
+  bcbc_no_scale_or_adapt = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_NO_SCALE_OR_ADAPT_12940400.csv")
 ),
 .id = "algorithm")
 
@@ -110,12 +119,12 @@ all_results[all_results == -1] = NA
 squash_trials <- all_results |>
   group_by(p, algorithm) |>
   # summarise(across(row_group_count:true_err, list(mean=mean, se=se)))
-  summarise(across(largest_group_in_untrue:adjusted.rand_col_true, list(mean=mean_filtered, se=se_filtered)))
-
-ggplot(squash_trials, aes(x=p, y=largest_group_in_untrue_mean, color=algorithm)) +
-  geom_line() +
-  geom_errorbar(aes(ymin = largest_group_in_untrue_mean - 1.96*largest_group_in_untrue_se,
-                    ymax = largest_group_in_untrue_mean + 1.96*largest_group_in_untrue_se))
+  summarise(across(feature_recall:adjusted.rand_col_true, list(mean=mean_filtered, se=se_filtered)))
+# 
+# ggplot(squash_trials, aes(x=p, y=largest_group_in_untrue_mean, color=algorithm)) +
+#   geom_line() +
+#   geom_errorbar(aes(ymin = largest_group_in_untrue_mean - 1.96*largest_group_in_untrue_se,
+#                     ymax = largest_group_in_untrue_mean + 1.96*largest_group_in_untrue_se))
 
 ggplot(squash_trials, aes(x=p, y=adjusted.rand_row_mean, color=algorithm)) +
   geom_line() +
@@ -126,4 +135,14 @@ ggplot(squash_trials, aes(x=p, y=adjusted.rand_col_true_mean, color=algorithm)) 
   geom_line() +
   geom_errorbar(aes(ymin = adjusted.rand_col_true_mean - 1.96*adjusted.rand_col_true_se,
                     ymax = adjusted.rand_col_true_mean + 1.96*adjusted.rand_col_true_se))
+
+ggplot(squash_trials, aes(x=p, y=feature_f1_mean, color=algorithm)) +
+  geom_line() +
+  geom_errorbar(aes(ymin = feature_f1_mean - 1.96*feature_f1_se,
+                    ymax = feature_f1_mean + 1.96*feature_f1_se))
+
+ggplot(squash_trials, aes(x=p, y=feature_auc_mean, color=algorithm)) +
+  geom_line() +
+  geom_errorbar(aes(ymin = feature_auc_mean - 1.96*feature_auc_se,
+                    ymax = feature_auc_mean + 1.96*feature_auc_se))
 ```

@@ -259,3 +259,42 @@ if(SAVE_RESULTS) {
   saveRDS(all_dct_results, paste0("./rds_files/all_dct_results", Sys.time(), ".RDS"))
 }
 ```
+
+
+# Manual Threshold
+
+
+```{r}
+
+all_threshold_results = list()
+for(checker in 1:length(all_checkers)) {
+  print(c(checker, as.character(Sys.time())))
+  row_dist <- dist(all_checkers[[checker]]$X)
+  row_threshold <- get_threshold_for_k_components(
+    row_dist,
+    k = 5,
+    max_threshold = max(row_dist),
+    maxiter = 100
+  )
+  
+  col_dist <- dist(t(all_checkers[[checker]]$X))
+  col_threshold <- get_threshold_for_k_components(
+    col_dist,
+    k = 5,
+    max_threshold = max(col_dist),
+    maxiter = 100
+  )
+
+  row_groups <- dbscan::comps(frNN(row_dist, row_threshold, sort = F))
+  col_groups <- dbscan::comps(frNN(col_dist, row_threshold, sort = F))
+  all_threshold_results[[checker]] <- list(
+    row_groups = row_groups,
+    col_groups = col_groups,
+    fitted_mat = NULL
+  )
+}
+
+if(SAVE_RESULTS) {
+  saveRDS(all_threshold_results, paste0("./simulated_experiments/rds_files/all_threshold_results", Sys.time(), ".RDS"))
+}
+```

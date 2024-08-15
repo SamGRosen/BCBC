@@ -18,6 +18,8 @@ cv.BCBC(
   tols = c(1e-06),
   weighted_clusters = TRUE,
   percent_noise = c(0.1),
+  num_row_clusters = NA,
+  num_col_clusters = NA,
   ...
 )
 }

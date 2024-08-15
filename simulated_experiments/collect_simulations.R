@@ -31,7 +31,7 @@ for(trial in 1:trials) {
   }
 }
 
-pattern <- "ADAPTIVE_BCBC_12173648_"
+pattern <- "BCBC_NO_SCALE_OR_ADAPT_12940400"
 
 print(paste("Getting paths for pattern", pattern))
 

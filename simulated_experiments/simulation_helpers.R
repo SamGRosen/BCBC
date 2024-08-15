@@ -44,6 +44,7 @@ evaluate_checker <- function(checker,
     to_return$feature_recall <- NA
     to_return$feature_precision <- NA
     to_return$feature_f1 <- NA
+    to_return$feature_auc <- NA
   } else {
     TP <- sum(checker$true_features > 0 & fitted_feature_coefs > 0)
     FN <- sum(checker$true_features > 0 & fitted_feature_coefs == 0)
@@ -55,6 +56,17 @@ evaluate_checker <- function(checker,
     } else {
       to_return$feature_f1 = 2 * TP / (2 * TP + FP + FN)
     }
+    print(fitted_feature_coefs)
+    print(checker$true_features)
+    if(length(unique(checker$true_features)) == 2) {
+      to_return$feature_auc <- ROCR::performance(
+        ROCR::prediction(
+          fitted_feature_coefs,
+          checker$true_features), "auc")@y.values[[1]]
+    } else {
+      to_return$feature_auc <- NA
+    }
+
   }
 
   if(length(untrue_feature_indices) > 0) {
