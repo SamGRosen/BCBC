@@ -47,64 +47,121 @@ matched_algo <- match(toupper(METHOD), c("ADAPTIVE_BCBC", "BCBC", "BCBC_NO_SCALE
                                          "BCBC_NO_SCALE_OR_ADAPT", "BCEL", "COBRA"))
 
 if(matched_algo == 1) {
-  result <- cv.BCBC(
+  result <- cv.BCBC_holdout(
     all_checkers[[ARRAY_ID]]$X,
-    lambdas = c(0, 2 ^ seq(-2, 6, 1)),
+    holdout_size = 0.15,
+    lambdas = c(0, 2 ^ seq(-7, 0, 1)),
     gammas = 2 ^ seq(1, 10, 2),
-    k_rows = 4,
-    k_cols = 10,
-    progress = TRUE,
-    scale_gamma = TRUE,
+    k_rows = c(4),
+    k_cols = c(10),
+    phis = c(0.25),
+    tols = c(1e-2),
+    tmax_outers = c(50),
+    tmax_inners = c(50)
+  )
+
+  best_params <- result$cv_data |> slice(which.min(rss_heldout))
+  print(best_params)
+
+  result$bcbc <- BCBC(
+    all_checkers[[ARRAY_ID]]$X,
+    lambda = best_params$lambda,
+    gamma = best_params$gamma,
+    k_row = 4,
+    k_col = 10,
+    phi = 0.25,
     recalculate_weights = TRUE,
-    tol=1e-4,
-    percent_noise = 0.1,
-    phi=0.25
+    scale_gamma = TRUE,
+    progress = TRUE,
+    tmax_outer = 500
   )
 } else if(matched_algo == 2) {
-  result <- cv.BCBC(
+  result <- cv.BCBC_holdout(
     all_checkers[[ARRAY_ID]]$X,
+    holdout_size = 0.15,
     lambdas = c(0, 2 ^ seq(-2, 6, 1)),
     gammas = 2 ^ seq(1, 10, 2),
-    progress = TRUE,
-    scale_gamma = TRUE,
-    k_rows = 4,
-    k_cols = 10,
+    k_rows = c(4),
+    k_cols = c(10),
+    phis = c(0.25),
+    tols = c(1e-2),
+    tmax_outers = c(50),
+    tmax_inners = c(50)
+  )
+
+  best_params <- result$cv_data |> slice(which.min(rss_heldout))
+  print(best_params)
+
+  result$bcbc <- BCBC(
+    all_checkers[[ARRAY_ID]]$X,
+    lambda = best_params$lambda,
+    gamma = best_params$gamma,
+    k_row = 4,
+    k_col = 6,
+    phi = 0.25,
     recalculate_weights = FALSE,
-    tol=1e-4,
-    percent_noise = 0.1,
-    phi=0.25
+    scale_gamma = TRUE,
+    progress = TRUE,
+    tmax_outer = 500
   )
 } else if(matched_algo == 3) {
-  result <- cv.BCBC(
+  result <- cv.BCBC_holdout(
     all_checkers[[ARRAY_ID]]$X,
-    lambdas = 2 ^ seq(-6,-2, 1),
-    gammas = 2 ^ seq(4, 14, 2),
-    progress = TRUE,
-    scale_gamma = FALSE,
-    k_rows = 4,
-    k_cols = 10,
+    holdout_size = 0.15,
+    lambdas = c(0, 2 ^ seq(-7, -1, 1)),
+    gammas = 2 ^ seq(3, 12, 1),
+    k_rows = c(4),
+    k_cols = c(6),
+    phis = c(0.25),
+    tols = c(10 ^ -2.5),
+    tmax_outers = c(50),
+    tmax_inners = c(50)
+  )
+
+  best_params <- result$cv_data |> slice(which.min(rss_heldout))
+  print(best_params)
+  result$bcbc <- BCBC(
+    all_checkers[[ARRAY_ID]]$X,
+    lambda = best_params$lambda,
+    gamma = best_params$gamma,
+    k_row = 4,
+    k_col = 6,
+    phi = 0.25,
+    tol = 10 ^ -4.5,
     recalculate_weights = TRUE,
-    tol=1e-4,
-    # percent_noise = 0.25,
-    phi=0.25,
-    num_row_clusters = 5,
-    num_col_clusters = 6
+    scale_gamma = FALSE,
+    progress = TRUE,
+    tmax_outer = 500
   )
 } else if(matched_algo == 4) {
-  result <- cv.BCBC(
+  result <- cv.BCBC_holdout(
     all_checkers[[ARRAY_ID]]$X,
-    lambdas = 2 ^ seq(-6,-2, 1),
-    gammas = 2 ^ seq(4, 14, 2),
-    progress = TRUE,
-    scale_gamma = FALSE,
-    k_rows = 4,
-    k_cols = 10,
+    holdout_size = 0.15,
+    lambdas = c(0, 2 ^ seq(-7, -1, 1)),
+    gammas = 2 ^ seq(3, 12, 1),
+    k_rows = c(4),
+    k_cols = c(6),
+    phis = c(0.25),
+    tols = c(10 ^ -2.5),
+    tmax_outers = c(50),
+    tmax_inners = c(50)
+  )
+
+  best_params <- result$cv_data |> slice(which.min(rss_heldout))
+  print(best_params)
+
+  result$bcbc <- BCBC(
+    all_checkers[[ARRAY_ID]]$X,
+    lambda = best_params$lambda,
+    gamma = best_params$gamma,
+    k_row = 4,
+    k_col = 6,
+    phi = 0.25,
+    tol = 1e-4,
     recalculate_weights = FALSE,
-    tol=1e-4,
-    # percent_noise = 0.25,
-    phi=0.25,
-    num_row_clusters = 5,
-    num_col_clusters = 6
+    scale_gamma = FALSE,
+    progress = TRUE,
+    tmax_outer = 500
   )
 } else if(matched_algo == 5) {
   library(BCEL)
@@ -137,7 +194,7 @@ if(matched_algo == 1) {
 }
 
 saveRDS(result, paste0(
-  "/cwork/sgr26/",
+  "/work/sgr26/",
   toupper(METHOD),
   "_",
   JOB_ID,

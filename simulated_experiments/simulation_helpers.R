@@ -1,5 +1,6 @@
 library(tidyverse)
 library(BCBC)
+library(WeightedCluster)
 
 overlap_to_groups <- function(row_memberships, col_memberships) {
   row_membership_df <- data.frame(row_memberships)
@@ -56,8 +57,7 @@ evaluate_checker <- function(checker,
     } else {
       to_return$feature_f1 = 2 * TP / (2 * TP + FP + FN)
     }
-    print(fitted_feature_coefs)
-    print(checker$true_features)
+
     if(length(unique(checker$true_features)) == 2) {
       to_return$feature_auc <- ROCR::performance(
         ROCR::prediction(
@@ -137,6 +137,25 @@ bcbc_extractor <- function(bcbc_result) {
     col_groups = bcbc_result$col_clusters[[best_index]],
     fitted_mat = bcbc_result$all_runs[[best_index]]$U,
     fitted_feature_coefs = bcbc_result$all_runs[[best_index]]$w
+  )
+}
+
+bcbc_extractor2 <- function(bcbc_result) {
+  swept <- sweep(bcbc_result$bcbc$U,
+                 2,
+                 bcbc_result$bcbc$w ^ 2 + bcbc_result$bcbc$lambda * bcbc_result$bcbc$w,
+                 "*")
+
+  row_threshold <- get_threshold_for_k_components(dist(swept),
+                                                    5)
+
+  row_clusters <- get_row_clusters(swept, row_threshold)
+  col_clusters <- wcKMedoids(dist(t(bcbc_result$bcbc$U)), 6, weights = bcbc_result$bcbc$w)$clustering
+  list(
+    row_groups = row_clusters,
+    col_groups = col_clusters,
+    fitted_mat = bcbc_result$bcbc$U,
+    fitted_feature_coefs = bcbc_result$bcbc$w
   )
 }
 

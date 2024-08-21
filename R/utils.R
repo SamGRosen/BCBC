@@ -205,7 +205,7 @@ plot_fit <- function(plot_df,
       )
     )
   } else {
-    label_annotation <- annotate(geom="blank")
+    label_annotation <- geom_blank()
   }
 
   if (alpha_weight) {

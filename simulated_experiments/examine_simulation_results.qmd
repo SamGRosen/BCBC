@@ -91,10 +91,10 @@ all_results <- bind_rows(list(
   ),
   cobra = read.csv("~/BCBC/simulated_experiments/rds_files/cobra2024-07-08.csv"),
   bcel = read.csv("~/BCBC/simulated_experiments/rds_files/BCEL_.csv"),
-  bcbc_no_scale = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_NO_SCALE_12940399.csv"),
+  bcbc_no_scale = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_NO_SCALE_14644486.csv"),
   # bcbc = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_12413888.csv"),
   # adaptive_bcbc = read.csv("~/BCBC/simulated_experiments/rds_files/ADAPTIVE_BCBC_12413887.csv"),
-  bcbc_no_scale_or_adapt = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_NO_SCALE_OR_ADAPT_12940400.csv")
+  bcbc_no_scale_or_adapt = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_NO_SCALE_OR_ADAPT_14644485.csv")
 ),
 .id = "algorithm")
 

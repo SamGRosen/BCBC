@@ -51,8 +51,8 @@ calc_fusion_term <- function(edges, weights, U, rows=TRUE) {
 #' @param tmax_outer
 #' @param tol
 #' @param recalculate_weights
+#' @param greedy_terminate
 #' @param approx
-#' @param threshold
 #' @param scale_gamma
 #' @param progress
 #'
@@ -71,8 +71,8 @@ BCBC <- function(X,
                  tmax_outer = 100,
                  tol = 1e-6,
                  recalculate_weights = TRUE,
+                 greedy_terminate = !recalculate_weights,
                  approx = 0,
-                 threshold = 0,
                  scale_gamma = TRUE,
                  progress = TRUE) {
   base_gamma <- gamma
@@ -116,13 +116,9 @@ BCBC <- function(X,
         phi = phi,
         approx = approx
       )
-      w_row <- wts$w_row
-      w_col <- wts$w_col
-      E_row <- wts$E_row
-      E_col <- wts$E_col
       row_fusion <- wts$row_fusion
       col_fusion <- wts$col_fusion
-      if(min(w_row) <= 0 || min(w_col) <= 0) {
+      if(min(wts$w_row) <= 0 || min(wts$w_col) <= 0) {
         warning(paste(
           "U has diverged, try increasing k_row, k_col or decreasing phi",
           "arguments to encourage fusion terms.",
@@ -141,13 +137,17 @@ BCBC <- function(X,
     objective_vals[t] <-
       gamma * (row_fusion + col_fusion) + rss_vals[t] / 2
 
+    if(t > 1 && greedy_terminate && objective_vals[t] > objective_vals[t-1]) {
+      break
+    }
+
     # Cobra has rows as features, columns as samples
     cobra_result <-
       cobra(t(U_step),
-            E_row,
-            E_col,
-            w_row,
-            w_col,
+            wts$E_row,
+            wts$E_col,
+            wts$w_row,
+            wts$w_col,
             gamma = gamma,
             max_iter = tmax_cobra,
             tol=tol)
@@ -155,7 +155,7 @@ BCBC <- function(X,
     U_prime <- t(cobra_result$U[[1]])
     U_diff <- sum(abs(U_prime - U)) / sum(abs(U_prime))
     cobra_diffs[t] <- U_diff
-    if (U_diff < tol) {
+    if (t > 1 && U_diff < tol) {
       U <- U_prime
       break
     }

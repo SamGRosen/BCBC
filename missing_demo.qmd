@@ -1,0 +1,99 @@
+```{r}
+library(devtools)
+load_all()
+```
+
+```{r}
+
+checker = gen_checkerboard(50, 50, 6, 6, p_extra = 500)
+# X <- checker$X
+# mask = which(matrix(runif(100 * 100), nrow=100) < 0.1, arr.ind = TRUE)
+# X[mask] = NA
+
+```
+
+```{r}
+test <- BCBC_missing(X, 0.01, tol=10 ^ -2.5, tmax_outer = 100, tmax_inner = 100)
+
+filled_diffs <- vapply(2:50, function(t) { sum(abs(test$filled_vals[t-1,]- test$filled_vals[t,])) / sum(abs(test$filled_vals[t,]))}, 0)
+w_diffs <-  vapply(2:50, function(t) { sum(abs(test$w_path[t-1,]- test$w_path[t,])) / sum(abs(test$w_path[t,]))}, 0)
+
+
+```
+
+
+```{r}
+cv__ <- cv.BCBC_holdout(
+  checker$X,
+  holdout_size = 0.1,
+  lambdas = c(0.0001, 0.01, 0.1),
+  gammas = c(25, 250),
+  k_rows = c(3),
+  k_cols = c(3),
+  phis = c(0.5),
+  tols = c(1e-2),
+  tmax_outers = c(50),
+  tmax_inners = c(50)
+)
+
+```
+
+```{r}
+
+cv1_orders <- cv$cv_data |>
+  mutate(rss_heldout=rank(rss_heldout),
+         rss_heldout_abs=rank(rss_heldout_abs),
+         rss_heldout_weighted=rank(rss_heldout_weighted),
+         rss_heldout_weighted_sq=rank(rss_heldout_weighted_sq),
+         rss_heldout_weighted_abs=rank(rss_heldout_weighted_abs),
+         rss_heldout_mean=rank(rss_heldout_mean),
+         rss_heldout_weighted_mean=rank(rss_heldout_weighted_mean),
+         rss_heldout_kurtosis=rank(rss_heldout_kurtosis),
+         rss_heldout_kurtosis2=rank(rss_heldout_kurtosis2),
+         rss_heldout_kurtosis3=rank(rss_heldout_kurtosis3),
+         rss_heldout_kurtosis4=rank(rss_heldout_kurtosis4)
+  )
+
+cv2_orders <- cv2$cv_data |>
+  mutate(rss_heldout=rank(rss_heldout),
+         rss_heldout_abs=rank(rss_heldout_abs),
+         rss_heldout_weighted=rank(rss_heldout_weighted),
+         rss_heldout_weighted_sq=rank(rss_heldout_weighted_sq),
+         rss_heldout_weighted_abs=rank(rss_heldout_weighted_abs),
+         rss_heldout_mean=rank(rss_heldout_mean),
+         rss_heldout_weighted_mean=rank(rss_heldout_weighted_mean),
+         rss_heldout_kurtosis=rank(rss_heldout_kurtosis),
+         rss_heldout_kurtosis2=rank(rss_heldout_kurtosis2),
+         rss_heldout_kurtosis3=rank(rss_heldout_kurtosis3),
+         rss_heldout_kurtosis4=rank(rss_heldout_kurtosis4)
+  )
+
+cv3_orders <- cv3$cv_data |>
+  mutate(rss_heldout=rank(rss_heldout),
+         rss_heldout_abs=rank(rss_heldout_abs),
+         rss_heldout_weighted=rank(rss_heldout_weighted),
+         rss_heldout_weighted_sq=rank(rss_heldout_weighted_sq),
+         rss_heldout_weighted_abs=rank(rss_heldout_weighted_abs),
+         rss_heldout_mean=rank(rss_heldout_mean),
+         rss_heldout_weighted_mean=rank(rss_heldout_weighted_mean),
+         rss_heldout_kurtosis=rank(rss_heldout_kurtosis),
+         rss_heldout_kurtosis2=rank(rss_heldout_kurtosis2),
+         rss_heldout_kurtosis3=rank(rss_heldout_kurtosis3),
+         rss_heldout_kurtosis4=rank(rss_heldout_kurtosis4)
+  )
+
+cv4_orders <- cv4$cv_data |>
+  mutate(rss_heldout=rank(rss_heldout),
+         rss_heldout_abs=rank(rss_heldout_abs),
+         rss_heldout_weighted=rank(rss_heldout_weighted),
+         rss_heldout_weighted_sq=rank(rss_heldout_weighted_sq),
+         rss_heldout_weighted_abs=rank(rss_heldout_weighted_abs),
+         rss_heldout_mean=rank(rss_heldout_mean),
+         rss_heldout_weighted_mean=rank(rss_heldout_weighted_mean),
+         rss_heldout_kurtosis=rank(rss_heldout_kurtosis),
+         rss_heldout_kurtosis2=rank(rss_heldout_kurtosis2),
+         rss_heldout_kurtosis3=rank(rss_heldout_kurtosis3),
+         rss_heldout_kurtosis4=rank(rss_heldout_kurtosis4)
+  )
+
+```
