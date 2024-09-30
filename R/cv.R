@@ -2,7 +2,6 @@
 #'
 #' @param X
 #' @param bcbc_run
-#' @param weighted_clusters
 #' @param percent_noise Percent of standard deviation of pairwise distances to use for thresholding
 #' @param num_row_clusters If set, tries to calculate a threshold to result in this many row clusters
 #' @param num_col_clusters If set, tries to calculate a threshold to result in this many column clusters
@@ -13,79 +12,40 @@
 #' @examples
 get_cv_metrics <- function(X,
                            bcbc_run,
-                           weighted_clusters = TRUE,
                            percent_noise = 0.25,
                            num_row_clusters = NA,
-                           num_col_clusters = NA,
-                           rss_offset = sd(X) / 100) {
-  U <- bcbc_run$U
-  w <- bcbc_run$w
-  lambda <- bcbc_run$lambda
+                           num_col_clusters = NA) {
   n <- nrow(X)
   p <- ncol(X)
-  swept <- sweep(U, 2, w ^ 2 + lambda * w, "*")
-  rss <- sum(sweep(X - U, 2, w ^ 2 + lambda * w, "*") ^ 2) + rss_offset
-  rss_no_lambda_sq <- sum(sweep(X - U, 2, w ^ 2, "*") ^ 2) + rss_offset
-  rss_no_lambda_no_sq <- sum(sweep(X - U, 2, w, "*") ^ 2) + rss_offset
-  if (weighted_clusters) {
-    solution_mat <- swept
-  } else {
-    solution_mat <- U
-  }
 
-  if(is.na(num_row_clusters)) {
-    row_threshold <- sd(dist(solution_mat)) * percent_noise
-  } else {
-    row_threshold <- get_threshold_for_k_components(dist(solution_mat),
-                                                    num_row_clusters)
-  }
-  if(is.na(num_col_clusters)) {
-    col_threshold <- sd(dist(t(solution_mat))) * percent_noise
-  } else {
-    col_threshold <- get_threshold_for_k_components(dist(t(solution_mat)),
-                                                    num_col_clusters)
-  }
-  row_clusters <- get_row_clusters(solution_mat, row_threshold)
-  col_clusters <- get_row_clusters(t(solution_mat), col_threshold)
+  weighted_biclusters <- get_weighted_biclusters(
+    bcbc_run$U,
+    weights = bcbc_run$w,
+    lambda = bcbc_run$lambda,
+    num_row_clusters = num_row_clusters,
+    num_col_clusters = num_col_clusters,
+    percent_noise = percent_noise
+  )
+  rss <- sum((X - bcbc_run$U)^2)
+  w2_rss <- sum(bcbc_run$w ^ 2 * colSums(X - bcbc_run$U)^2)
+  row_clusters <- weighted_biclusters$row_clusters
+  col_clusters <- weighted_biclusters$col_clusters
 
   num_row_clusters <- length(unique(row_clusters))
   num_col_clusters <- length(unique(col_clusters))
+  num_bi_clusters <- num_row_clusters * num_col_clusters
 
-  sparsity_kurtosis <- sum(w ^ 2) ^ 2 / sum(w ^ 4)
-  sparsity_non_zero_w <- sum(w > 1e-10)
-  sparsity_non_zero_sol <- sum(abs(swept) > 1e-10)
-  return(list(
+  list(
     cv_metrics = list(
       num_row_clusters = num_row_clusters,
       num_col_clusters = num_col_clusters,
-      sparsity_kurtosis = sparsity_kurtosis,
-      sparsity_non_zero_w = sparsity_non_zero_w,
-      sparsity_non_zero_sol = sparsity_non_zero_sol,
       rss = rss,
-      rss_no_lambda_sq = rss_no_lambda_sq,
-      rss_no_lambda_no_sq = rss_no_lambda_no_sq,
-      BIC = n * p * log(rss_no_lambda_sq / n * p) +
-        1 * log(n * p) * (num_row_clusters * num_col_clusters +
-                            sparsity_non_zero_w),
-      eBIC1 = n * p * log(rss_no_lambda_sq / n * p) +
-        2 * log(n * p) * (num_row_clusters * num_col_clusters +
-                            sparsity_non_zero_w),
-      eBIC2 = n * p * log(rss_no_lambda_sq / n * p) +
-        3 * log(n * p) * (num_row_clusters * num_col_clusters +
-                            sparsity_non_zero_w),
-      BIC_no_sq = n * p * log(rss_no_lambda_no_sq / n * p) +
-        1 * log(n * p) * (num_row_clusters * num_col_clusters +
-                            sparsity_non_zero_w),
-      eBIC1_no_sq = n * p * log(rss_no_lambda_no_sq / n * p) +
-        2 * log(n * p) * (num_row_clusters * num_col_clusters +
-                            sparsity_non_zero_w),
-      eBIC2_no_sq = n * p * log(rss_no_lambda_no_sq / n * p) +
-        3 * log(n * p) * (num_row_clusters * num_col_clusters +
-                            sparsity_non_zero_w)
+      w2_rss = w2_rss,
+      BIC = n * p * log(w2_rss / n * p) + log(n * p) * num_bi_clusters
     ),
     row_clusters = row_clusters,
     col_clusters = col_clusters
-  ))
+  )
 }
 
 
@@ -94,7 +54,6 @@ get_cv_metrics <- function(X,
 #' @param X
 #' @param bcbc_runs
 #' @param all_params
-#' @param weighted_clusters
 #' @param percent_noise
 #' @param num_row_clusters
 #' @param num_col_clusters
@@ -106,7 +65,6 @@ get_cv_metrics <- function(X,
 get_all_cv_metrics <- function(X,
                                bcbc_runs,
                                all_params = data.frame(),
-                               weighted_clusters = TRUE,
                                percent_noise = 0.25,
                                num_row_clusters = NA,
                                num_col_clusters = NA) {
@@ -119,7 +77,6 @@ get_all_cv_metrics <- function(X,
     cv_info <- get_cv_metrics(
       X,
       bcbc_runs[[param_set]],
-      weighted_clusters = weighted_clusters,
       percent_noise = percent_noise,
       num_row_clusters = num_row_clusters,
       num_col_clusters = num_col_clusters
@@ -145,8 +102,8 @@ get_all_cv_metrics <- function(X,
 #'
 #' @param X
 #' @param lambdas
-#' @param k_rows
-#' @param k_cols
+#' @param k_samples
+#' @param k_features
 #' @param gammas
 #' @param tmaxs
 #' @param tmax_outers
@@ -154,7 +111,6 @@ get_all_cv_metrics <- function(X,
 #' @param phis
 #' @param recalculate_weights
 #' @param tols
-#' @param weighted_clusters
 #' @param percent_noise
 #' @param progress
 #' @param ... passed to BCBC
@@ -166,8 +122,8 @@ get_all_cv_metrics <- function(X,
 #' @examples
 cv.BCBC <- function(X,
                     lambdas = c(1),
-                    k_rows = c(2),
-                    k_cols = c(2),
+                    k_samples = c(2),
+                    k_features = c(2),
                     gammas = c(1),
                     tmaxs = c(NA),
                     tmax_outers = c(100),
@@ -175,8 +131,7 @@ cv.BCBC <- function(X,
                     phis = c(0.5),
                     recalculate_weights = c(TRUE),
                     tols = c(1e-6),
-                    weighted_clusters = TRUE,
-                    percent_noise = c(0.1),
+                    percent_noise = c(0.25),
                     num_row_clusters = NA,
                     num_col_clusters = NA,
                     ...) {
@@ -184,8 +139,8 @@ cv.BCBC <- function(X,
   all_params <-
     expand.grid(
       lambda = lambdas,
-      k_row = k_rows,
-      k_col = k_cols,
+      k_samples = k_samples,
+      k_features = k_features,
       gamma = gammas,
       tmax = tmaxs,
       tmax_outer = tmax_outers,
@@ -212,7 +167,6 @@ cv.BCBC <- function(X,
 
       cv_metrics <- get_cv_metrics(X,
                                    result,
-                                   weighted_clusters = weighted_clusters,
                                    percent_noise = percent_noise,
                                    num_row_clusters = num_row_clusters,
                                    num_col_clusters = num_col_clusters)
@@ -236,16 +190,4 @@ cv.BCBC <- function(X,
   return(list(all_runs = all_runs, cv_data = cv_data,
               row_clusters = row_clusters, col_clusters = col_clusters,
               all_params = all_params))
-}
-
-melt_cv_data <- function(tuning_data) {
-  # Makes a big df mostly for visualization
-  num_runs <- nrow(tuning_data$cv_data)
-  to_return <-
-    cbind(matrix_fit_to_df(tuning_data$all_runs[[1]]), tuning_data$cv_data[1, ])
-  for (i in 2:num_runs) {
-    to_return <- rbind(to_return,
-                       cbind(matrix_fit_to_df(tuning_data$all_runs[[i]]), tuning_data$cv_data[i, ]))
-  }
-  return(to_return)
 }

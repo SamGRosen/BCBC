@@ -250,3 +250,46 @@ cobra <- function(X,E_row,E_col,w_row,w_col,gamma,max_iter=1e2,tol=1e-3) {
   return(list(U=list_U,V_row=list_V_row,V_col=list_V_col,
               Lambda_col=list_Lambda_col,Lambda_row=list_Lambda_row))
 }
+
+
+#' Title
+#'
+#' @param X
+#' @param gamma
+#' @param k_samples
+#' @param k_features
+#' @param phi
+#' @param max_iter
+#' @param tol
+#'
+#' @return
+#' @export
+#'
+#' @examples
+cobra_knn <- function(X,
+                      gamma,
+                      k_samples = 2,
+                      k_features = 2,
+                      phi = 1,
+                      max_iter = 250,
+                      tol = 1e-4) {
+  wts <- fast_gkn_weights(
+    t(X),
+    k_row = k_features,
+    k_col = k_samples,
+    phi = phi,
+    approx = 0
+  )
+  cobra_result <-
+    cobra(
+      t(X),
+      wts$E_row,
+      wts$E_col,
+      wts$w_row,
+      wts$w_col,
+      gamma = gamma,
+      max_iter = tmax_cobra,
+      tol = tol
+    )
+  t(cobra_result$U[[1]])
+}

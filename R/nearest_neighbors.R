@@ -77,10 +77,12 @@ fast_gkn_weights <- function(X,
 
   # Construct edge-incidence matrices
   E_row <-
-    create_edge_incidence_edges(cbind(unique_row_edges$from_node, unique_row_edges$to_node),
+    create_edge_incidence_edges(cbind(unique_row_edges$from_node,
+                                      unique_row_edges$to_node),
                                 n)
   E_col <-
-    create_edge_incidence_edges(cbind(unique_col_edges$from_node, unique_col_edges$to_node),
+    create_edge_incidence_edges(cbind(unique_col_edges$from_node,
+                                      unique_col_edges$to_node),
                                 p)
   to_return <- list(
     w_row = row_weights,

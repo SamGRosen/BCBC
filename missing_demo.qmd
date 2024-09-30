@@ -5,7 +5,7 @@ load_all()
 
 ```{r}
 
-checker = gen_checkerboard(50, 50, 6, 6, p_extra = 500)
+checker = gen_checkerboard(50, 50, 6, 6, p_extra = 50)
 # X <- checker$X
 # mask = which(matrix(runif(100 * 100), nrow=100) < 0.1, arr.ind = TRUE)
 # X[mask] = NA
@@ -13,7 +13,7 @@ checker = gen_checkerboard(50, 50, 6, 6, p_extra = 500)
 ```
 
 ```{r}
-test <- BCBC_missing(X, 0.01, tol=10 ^ -2.5, tmax_outer = 100, tmax_inner = 100)
+test <- BCBC_missing(X, 0.01, tol=10 ^ -2.5, tmax_outer = 50, tmax_inner = 50)
 
 filled_diffs <- vapply(2:50, function(t) { sum(abs(test$filled_vals[t-1,]- test$filled_vals[t,])) / sum(abs(test$filled_vals[t,]))}, 0)
 w_diffs <-  vapply(2:50, function(t) { sum(abs(test$w_path[t-1,]- test$w_path[t,])) / sum(abs(test$w_path[t,]))}, 0)
@@ -23,15 +23,16 @@ w_diffs <-  vapply(2:50, function(t) { sum(abs(test$w_path[t-1,]- test$w_path[t,
 
 
 ```{r}
+
 cv__ <- cv.BCBC_holdout(
   checker$X,
-  holdout_size = 0.1,
-  lambdas = c(0.0001, 0.01, 0.1),
-  gammas = c(25, 250),
+  holdout_size = 0.15,
+  lambdas = c(0, 0.01, 0.25),
+  gammas = c(64),
   k_rows = c(3),
-  k_cols = c(3),
+  k_cols = c(4),
   phis = c(0.5),
-  tols = c(1e-2),
+  tols = c(10 ^ -2.5),
   tmax_outers = c(50),
   tmax_inners = c(50)
 )

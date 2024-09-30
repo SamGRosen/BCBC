@@ -8,7 +8,6 @@ get_all_cv_metrics(
   X,
   bcbc_runs,
   all_params = data.frame(),
-  weighted_clusters = TRUE,
   percent_noise = 0.25,
   num_row_clusters = NA,
   num_col_clusters = NA

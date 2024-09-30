@@ -7,19 +7,18 @@
 BCBC(
   X,
   lambda,
-  k_row = 4,
-  k_col = 4,
+  k_features = 4,
+  k_samples = 4,
   gamma = 10,
   phi = 0.05,
   tmax = NA,
   tmax_cobra = 100,
   tmax_outer = 100,
-  tol = 1e-06,
+  tol = 1e-05,
   recalculate_weights = TRUE,
+  greedy_terminate = !recalculate_weights,
   approx = 0,
-  scale_gamma = TRUE,
-  progress = TRUE,
-  wts = NULL
+  progress = TRUE
 )
 }
 \arguments{

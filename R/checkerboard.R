@@ -2,11 +2,11 @@
 #'
 #' @param n number of rows
 #' @param p number of columns
-#' @param num_row_clusters
-#' @param num_col_clusters
+#' @param num_row_clusters number of row clusters
+#' @param num_col_clusters number of column clusters
 #' @param p_extra number of extra noisy columns
 #' @param noise standard deviation of normal noise added to checkerboard
-#' @param prob_empty between 0 and 1, probability a bicluster is empty
+#' @param prob_empty between 0 and 1, probability a bicluster is 0
 #' @param shuffle randomly reorder rows and columns
 #' @param scale the resulting matrix
 #'

@@ -239,3 +239,43 @@ plot_fit <- function(plot_df,
     ylab(ylabel) +
     ggtitle(title)
 }
+
+
+plot_w_path <- function(w_path, reorder=TRUE) {
+  if (any(is.na(w_path[, 1]))) {
+    first_NA <- which.max(is.na(w_path[, 1]))
+    w_path <- w_path[1:(first_NA - 1), ]
+  }
+
+  if(reorder) {
+    w_path <- w_path[, order(colSums(w_path == 0))]
+  }
+  as_df <- as.data.frame(w_path) |>
+    mutate(row_num = row_number()) |>
+    pivot_longer(!row_num, names_to = "col_num") |>
+    mutate(col_num = as.numeric(str_replace(col_num, "V", "")))
+
+  ggplot(as_df, aes(col_num, row_num)) +
+    geom_raster(aes(fill = value)) +
+    xlab("Index") +
+    ylab("Iteration") +
+    scale_fill_gradient2(low = "#EEE", high = "blue") +
+    annotate(
+      "line",
+      x = 1:ncol(w_path),
+      y = colSums(w_path != 0),
+      alpha = 0.25,
+      linewidth = 1.1,
+      color = "red"
+    ) +
+    annotate(
+      "line",
+      x = rowSums(w_path != 0),
+      y = 1:nrow(w_path),
+      orientation = "y",
+      alpha = 0.25,
+      linewidth = 1.1,
+      color = "green"
+    ) +
+    theme_minimal()
+}

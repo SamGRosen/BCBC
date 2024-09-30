@@ -7,8 +7,8 @@
 BCBC_missing(
   X,
   lambda,
-  k_row = 4,
-  k_col = 4,
+  k_samples = 4,
+  k_features = 4,
   gamma = 10,
   phi = 0.05,
   tmax_inner = 50,
@@ -16,8 +16,9 @@ BCBC_missing(
   tol = 1e-04,
   recalculate_weights = FALSE,
   approx = 0,
-  progress = TRUE,
-  fusion_weights = NA
+  progress = FALSE,
+  fusion_weights = NA,
+  return_fit = FALSE
 )
 }
 \arguments{

@@ -9,14 +9,13 @@ cv.BCBC_holdout(
   holdout_size = 0.1,
   lambdas = c(1),
   gammas = c(1),
-  k_rows = c(2),
-  k_cols = c(2),
+  k_samples = c(2),
+  k_features = c(2),
   phis = c(0.5),
   recalculate_weights = c(FALSE),
   tols = c(0.001),
   tmax_outers = c(50),
   tmax_inners = c(50),
-  retrain = TRUE,
   ...
 )
 }

@@ -1,6 +1,39 @@
 library(tidyverse)
 library(BCBC)
-library(WeightedCluster)
+
+
+generate_checkers <- function(seed=2024) {
+  set.seed(seed)
+  all_checkers <- list()
+
+  trials <- 20
+  noise_levels <- c(3)
+  extra_dims <- c(0, 50, 100, 250, 500, 1000)
+
+  i <- 1
+  for (trial in 1:trials) {
+    for (noise_level in noise_levels) {
+      for (extra_dim in extra_dims) {
+        all_checkers[[i]] <- gen_checkerboard(
+          100,
+          100,
+          5,
+          5,
+          noise = noise_level,
+          cluster_spread = 10,
+          p_extra = extra_dim,
+          prob_empty = 0
+        )
+        all_checkers[[i]]$noise_level = noise_level
+        all_checkers[[i]]$extra_dim = extra_dim
+        all_checkers[[i]]$trial = trial
+        i <- i + 1
+      }
+    }
+  }
+
+  all_checkers
+}
 
 overlap_to_groups <- function(row_memberships, col_memberships) {
   row_membership_df <- data.frame(row_memberships)
@@ -100,6 +133,7 @@ evaluate_checker <- function(checker,
   } else {
     to_return$true_err <- mean((checker$centers - fitted_mat)^2)
   }
+
   to_return
 }
 
@@ -130,41 +164,24 @@ get_all_checker_results <- function(all_checkers, all_results, extractor) {
 }
 
 bcbc_extractor <- function(bcbc_result) {
-  best_run <- bcbc_result$cv_data |> slice(which.min(eBIC2))
+  best_run <- bcbc_result$cv$cv_data |> slice(which.min(BIC))
   best_index <- best_run$index
   list(
-    row_groups = bcbc_result$row_clusters[[best_index]],
-    col_groups = bcbc_result$col_clusters[[best_index]],
-    fitted_mat = bcbc_result$all_runs[[best_index]]$U,
-    fitted_feature_coefs = bcbc_result$all_runs[[best_index]]$w
-  )
-}
-
-bcbc_extractor2 <- function(bcbc_result) {
-  swept <- sweep(bcbc_result$bcbc$U,
-                 2,
-                 bcbc_result$bcbc$w ^ 2 + bcbc_result$bcbc$lambda * bcbc_result$bcbc$w,
-                 "*")
-
-  row_threshold <- get_threshold_for_k_components(dist(swept),
-                                                    5)
-
-  row_clusters <- get_row_clusters(swept, row_threshold)
-  col_clusters <- wcKMedoids(dist(t(bcbc_result$bcbc$U)), 6, weights = bcbc_result$bcbc$w)$clustering
-  list(
-    row_groups = row_clusters,
-    col_groups = col_clusters,
-    fitted_mat = bcbc_result$bcbc$U,
-    fitted_feature_coefs = bcbc_result$bcbc$w
+    row_groups = bcbc_result$cv$row_clusters[[best_index]],
+    col_groups = bcbc_result$cv$col_clusters[[best_index]],
+    fitted_mat = bcbc_result$cv$all_runs[[best_index]]$U,
+    fitted_feature_coefs = bcbc_result$cv$all_runs[[best_index]]$w
   )
 }
 
 cobra_extractor <- function(cobra_result) {
-  best_result <- which.min(cobra_result$validation_error)
+  cobra_clusters = get_weighted_biclusters(t(cobra_result$U),
+                                           weights = 1,
+                                           percent_noise = 0.25)
   list(
-    col_groups = cobra_result$groups_row[[best_result]]$cluster,
-    row_groups = cobra_result$groups_col[[best_result]]$cluster,
-    fitted_mat = t(cobra_result$U[[best_result]])
+    col_groups = cobra_clusters$col_clusters,
+    row_groups = cobra_clusters$row_clusters,
+    fitted_mat = t(cobra_result$U)
   )
 }
 

@@ -2,8 +2,8 @@
 #'
 #' @param X
 #' @param lambda
-#' @param k_row
-#' @param k_col
+#' @param k_samples
+#' @param k_features
 #' @param gamma
 #' @param phi
 #' @param tmax_inner
@@ -20,8 +20,8 @@
 #' @examples
 BCBC_missing <- function(X,
                          lambda,
-                         k_row = 4,
-                         k_col = 4,
+                         k_samples = 4,
+                         k_features = 4,
                          gamma = 10,
                          phi = 0.05,
                          tmax_inner = 50,
@@ -29,16 +29,16 @@ BCBC_missing <- function(X,
                          tol = 1e-4,
                          recalculate_weights = FALSE,
                          approx = 0,
-                         progress = TRUE,
+                         progress = FALSE,
                          fusion_weights = NA,
                          return_fit = FALSE) {
   n <- nrow(X)
   p <- ncol(X)
 
-  print("oeijfeoij")
   valid_indices <- which(is.finite(X), arr.ind = TRUE)
   invalid_indices <- which(!is.finite(X), arr.ind = TRUE)
 
+  missing_columns <- sort(unique(invalid_indices[, 2]))
   stopifnot("missing values must have length > 0"= nrow(invalid_indices) > 0)
 
   filled_vals = matrix(NA, nrow=tmax_outer, ncol=nrow(invalid_indices))
@@ -50,8 +50,8 @@ BCBC_missing <- function(X,
   if(!is.list(fusion_weights)) {
     fusion_wts <- fast_gkn_weights(
       t(U),
-      k_row = k_row,
-      k_col = k_col,
+      k_col = k_samples,
+      k_row = k_features,
       phi = phi,
       approx = approx
     )
@@ -63,6 +63,8 @@ BCBC_missing <- function(X,
       pb <- progress_bar$new(
         format = paste0(t, "/", tmax_outer, " imputing iter [:bar] :percent"),
         total = tmax_inner)
+    } else {
+      pb <- NULL
     }
 
     M <- X
@@ -70,13 +72,14 @@ BCBC_missing <- function(X,
     bcbc_result <- BCBC_missing_iter(
       M,
       w_tilde = w,
+      missing_indices = invalid_indices,
       lambda = lambda,
       gamma = gamma,
       recalculate_weights = FALSE,
       wts = fusion_wts,
       progress_bar = pb,
-      tmax=tmax_inner,
-      tol=tol
+      tmax = tmax_inner,
+      tol = tol
     )
     U <- bcbc_result$U
     w <- bcbc_result$w
@@ -102,13 +105,15 @@ BCBC_missing <- function(X,
       filled_vals = filled_vals,
       invalid_indices = invalid_indices
     )
-  )}
+  )
+}
 
 BCBC_missing_iter <- function(X,
                               w_tilde,
+                              missing_indices,
                               lambda,
-                              k_row = 4,
-                              k_col = 4,
+                              k_samples = 4,
+                              k_features = 4,
                               gamma = 10,
                               phi = 0.05,
                               tmax = NA,  # Set this to set both below
@@ -129,23 +134,27 @@ BCBC_missing_iter <- function(X,
     tmax_outer <- tmax
   }
 
-  w_tilde_term <- (w_tilde ^ 2 + lambda * w_tilde) / 2
   start <- Sys.time()
   for (t in 1:tmax_outer) {
-    U_step <- U - sweep(X - U, 2, (w ^ 2 + lambda * w) / 2 + w_tilde_term, "*")
+    U_step <- U - sweep(X - U, 2, w ^ 2 + lambda * w, "*")
+    # U_step <- U - sweep(X - U, 2, w, "*")
+
+    U_step[missing_indices] <- U[missing_indices] -
+      (X[missing_indices] - U[missing_indices]) *
+      (w[missing_indices[, 2]] - w_tilde[missing_indices[, 2]])^2
 
     if (recalculate_weights || (t == 1 && !is.list(wts))) {
       wts <- fast_gkn_weights(
         t(U_step),
-        k_row = k_row,
-        k_col = k_col,
+        k_col = k_samples,
+        k_row = k_features,
         phi = phi,
         approx = approx
       )
 
       if(min(wts$w_row) <= 0 || min(wts$w_col) <= 0) {
         warning(paste(
-          "U has diverged, try increasing k_row, k_col or decreasing phi",
+          "U has diverged, try increasing k_samples, k_features or decreasing phi",
           "arguments to encourage fusion terms.",
           "Returning current step"))
         break
@@ -171,18 +180,22 @@ BCBC_missing_iter <- function(X,
     }
     U <- U_prime
 
-    col_sum_sq <- colSums((X - U) ^ 2)
+    # w_deriv_as_mat <- matrix(1, nrow=n, ncol=p, byrow=TRUE)
+    w_deriv_as_mat <- matrix(w + lambda / 2, nrow=n, ncol=p, byrow=TRUE)
+    w_deriv_as_mat[missing_indices] <- w[missing_indices[, 2]] - w_tilde[missing_indices[, 2]]
+
+    col_sum_sq <- colSums((X - U) ^ 2 * w_deriv_as_mat)
     lipschitz_fixed_U = sqrt(sum(col_sum_sq ^ 2))
-    nu_w = 1/(sqrt(2) * lipschitz_fixed_U)
+    nu_w = 1/(1.1 * lipschitz_fixed_U)
 
-    w_prime <-
-      projection_onto_simplex(w - nu_w * (w + lambda / 2) * col_sum_sq)
-
+    # w_prime <-
+    #   projection_onto_simplex(w - nu_w / sqrt(p) * col_sum_sq)
+    w_prime <- projection_onto_simplex(w - nu_w * col_sum_sq)
     w_diff <- sum((w_prime - w) ^ 2)
     w <- w_prime
 
-    if (is.object(progress_bar)) {
-      progress_bar$tick()
+    if (is.object(progress_bar) && t %% 10 == 0) {
+      progress_bar$update(t / tmax_outer)
     }
   }
 

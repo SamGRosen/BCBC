@@ -46,44 +46,6 @@ get_row_clusters <- function(mat, threshold) {
 }
 
 
-#' Title
-#'
-#' @param bcbc_result
-#' @param percent_of_noise
-#' @param cluster_w_weights
-#'
-#' @return
-#' @export
-#'
-#' @examples
-thresholded_solution <- function(bcbc_result,
-                                 percent_of_noise,
-                                 cluster_w_weights = TRUE) {
-  to_return <- list()
-  w <- bcbc_result$w
-  U <- bcbc_result$U
-  lambda <- bcbc_result$lambda
-  if (cluster_w_weights) {
-    w_vals <- sqrt(w^2 + lambda * w)
-    solution_mat <- sweep(U, 2, w_vals, "*")
-  } else {
-    solution_mat <- U
-  }
-  row_sd <- sd(dist(solution_mat))
-  threshold <- row_sd * percent_of_noise
-  clustering <- centroid_rows(U, solution_mat, threshold)
-  bcbc_result$U <- clustering$mat
-  bcbc_result$cluster_info <- clustering$cluster_info
-
-  to_return$w <- w
-  to_return$lambda <- lambda
-  to_return$cluster_info <- clustering$cluster_info
-  to_return$U <- clustering$mat
-
-  return(to_return)
-}
-
-
 #' Get radius to create k connected components in a nearest neighbor graph
 #'
 #' @param dist_mat
@@ -115,4 +77,63 @@ get_threshold_for_k_components <- function(dist_mat,
                   maxiter = maxiter,
                   tol = 1e-10)
   root$root
+}
+
+#' Title
+#'
+#' @param U
+#' @param weights
+#' @param lambda
+#' @param num_row_clusters
+#' @param num_col_clusters
+#' @param percent_noise
+#'
+#' @return
+#' @export
+#'
+#' @examples
+get_weighted_biclusters <- function(U,
+                                    weights=NA,
+                                    lambda=NA,
+                                    num_row_clusters=NA,
+                                    num_col_clusters=NA,
+                                    percent_noise=0.25) {
+  n = nrow(U)
+  p = ncol(U)
+  if(any(is.na(weights))) {
+    weights <- rep(1, p)
+    lambda <- NA
+  }
+  non_zero <- which(weights > 0)
+  non_zero_w <- weights[non_zero]
+
+  if(is.finite(lambda)) {
+    non_zero_w <- non_zero_w^2 + lambda * non_zero_w
+  }
+
+  removed <- U[, non_zero]
+  weighted_and_removed <- sweep(removed, 2, non_zero_w, "*")
+
+  if(is.na(num_row_clusters)) {
+    row_threshold <- sd(dist(weighted_and_removed)) * percent_noise
+  } else {
+    row_threshold <- get_threshold_for_k_components(dist(weighted_and_removed),
+                                                    num_row_clusters)
+  }
+  if(is.na(num_col_clusters)) {
+    col_threshold <- sd(dist(t(removed))) * percent_noise
+  } else {
+    col_threshold <- get_threshold_for_k_components(dist(t(removed)),
+                                                    num_col_clusters)
+  }
+  row_clusters <- get_row_clusters(weighted_and_removed, row_threshold)
+  col_clusters_non_zero <- get_row_clusters(t(removed), col_threshold)
+
+  col_clusters <- rep(0, p)  # 0 is dummy label
+  col_clusters[non_zero] <- col_clusters_non_zero
+
+  list(
+    row_clusters = row_clusters,
+    col_clusters = col_clusters
+  )
 }

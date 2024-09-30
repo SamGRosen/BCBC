@@ -7,8 +7,8 @@
 cv.BCBC(
   X,
   lambdas = c(1),
-  k_rows = c(2),
-  k_cols = c(2),
+  k_samples = c(2),
+  k_features = c(2),
   gammas = c(1),
   tmaxs = c(NA),
   tmax_outers = c(100),
@@ -16,8 +16,7 @@ cv.BCBC(
   phis = c(0.5),
   recalculate_weights = c(TRUE),
   tols = c(1e-06),
-  weighted_clusters = TRUE,
-  percent_noise = c(0.1),
+  percent_noise = c(0.25),
   num_row_clusters = NA,
   num_col_clusters = NA,
   ...

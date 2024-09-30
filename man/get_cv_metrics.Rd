@@ -7,11 +7,9 @@
 get_cv_metrics(
   X,
   bcbc_run,
-  weighted_clusters = TRUE,
   percent_noise = 0.25,
   num_row_clusters = NA,
-  num_col_clusters = NA,
-  rss_offset = sd(X)/100
+  num_col_clusters = NA
 )
 }
 \arguments{

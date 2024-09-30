@@ -22,11 +22,15 @@ gen_checkerboard(
 
 \item{p}{number of columns}
 
+\item{num_row_clusters}{number of row clusters}
+
+\item{num_col_clusters}{number of column clusters}
+
 \item{p_extra}{number of extra noisy columns}
 
 \item{noise}{standard deviation of normal noise added to checkerboard}
 
-\item{prob_empty}{between 0 and 1, probability a bicluster is empty}
+\item{prob_empty}{between 0 and 1, probability a bicluster is 0}
 
 \item{shuffle}{randomly reorder rows and columns}
 
