@@ -1,0 +1,237 @@
+```{r}
+library(cvxclustr) 
+
+transform_w <- function(graph) {
+  num_nodes <- max(graph$unique_edges$from_node, graph$unique_edges$to_node)
+  num_edges <- choose(num_nodes, 2)
+  
+  to_return <- rep(0, num_edges)
+  
+  new_indices <- graph$unique_edges$from_node * (num_nodes - 0.5) + graph$unique_edges$to_node - 0.5 * graph$unique_edges$from_node^2 - num_nodes
+  to_return[new_indices] <- graph$weights
+  
+  to_return
+}
+
+algebraic_connectivity <- function(graph) {
+  weighted_incidence <- sweep(graph$E_row, 1, sqrt(graph$weights), "*")
+  singular_vals <- svd(weighted_incidence)$d
+  singular_vals[length(singular_vals) - 1]
+}
+
+calc_fusion_term <- function(edges, weights, U) {
+  from_node <- edges$from_node
+  to_node <- edges$to_node
+
+  all_distances <- rep(NA, length(from_node))
+  for(i in seq_along(from_node)) {
+    all_distances[i] = sqrt(sum((U[from_node[i], ] - U[to_node[i], ])^2))
+  }
+  return(sum(sqrt(weights) * all_distances))
+}
+
+```
+
+```{r}
+set.seed(2024)
+
+all_checkers <- list()
+trials <- 15
+
+n = 100
+noises = c(1, 2, 3, 4)
+ps = c(20, 40)
+i <- 1
+for (trial in 1:trials) {
+  for (p in ps) {
+    for (noise in noises) {
+      all_checkers[[i]] <- gen_checkerboard(
+        n,
+        p,
+        5,
+        10,
+        noise = noise,
+        cluster_spread = 3,
+        p_extra = 0,
+        prob_empty = 0,
+        shuffle = FALSE,
+        scale = F
+      )
+      i <- i + 1
+    }
+  }
+}
+
+all_data <- tibble(
+  graph_type = character(),
+  oracle = logical(),
+  trial = numeric(),
+  true_rss = numeric(),
+  rss = numeric(),
+  algebraic_connectivity = numeric(),
+  oracle_fusion = numeric(),
+  fusion = numeric(),
+  num_edges = numeric(),
+  n = numeric(),
+  p = numeric(),
+  noise = numeric()
+)
+
+```
+
+```{r}
+
+run_for_connectivity <- function(checker, weight_builder, graph_type, gammas) {
+  to_return <- tibble()
+  row_graph <- weight_builder(checker)
+
+  graph_clusterings <- cvxclust_path_admm(t(checker$X),
+                                  transform_w(row_graph), gammas)
+
+  noisy_affinity_oracle_fusion_col <- calc_fusion_term(row_graph$unique_edges, row_graph$weights, checker$centers)
+
+  i <- 1
+  for (gamma in gammas) {
+    to_return <- to_return |>
+      rbind(
+        tibble(
+          graph_type = graph_type,
+          trial = trial,
+          true_rss = c(sum((
+            t(graph_clusterings$U[[i]]) - checker$centers
+          ) ^ 2)),
+          rss = c(sum((
+            t(graph_clusterings$U[[i]]) - checker$X
+          ) ^ 2)),
+          algebraic_connectivity = c(
+            algebraic_connectivity(row_graph)
+          ),
+          fusion = c(
+            noisy_affinity_oracle_fusion_col
+          ),
+          gamma = gamma,
+          num_edges = nrow(row_graph$E_row),
+          p = ncol(checker$X),
+          n = nrow(checker$X),
+          noise = checker$noise
+        )
+      )
+    
+    i <- i + 1
+  }
+  
+  to_return
+}
+
+```
+
+
+```{r}
+gammas <- seq(0, 40, 3)
+
+for(trial in 1:length(all_checkers)) {
+  print(trial)
+  all_data <- all_data |>
+    rbind(run_for_connectivity(all_checkers[[trial]], function(checker) {
+      geometric_medoid(checker$X, rescale = F, uniform = T)
+    }, "star", gammas))
+  
+  all_data <- all_data |>
+    rbind(run_for_connectivity(all_checkers[[trial]], function(checker) {
+      full_connectivity(checker$X, rescale = F, uniform = T)
+    }, "full", gammas))
+  
+  for (k in 2 ^ (1:5)) {
+    print(k)
+    all_data <- all_data |>
+      rbind(run_for_connectivity(all_checkers[[trial]], function(checker) {
+        knn_graph(checker$X, k, rescale = F, uniform = T)
+      }, paste0("knn", k), gammas))
+  }
+}
+```
+
+```{r}
+
+best_per_trial <- all_data |> group_by(graph_type, trial, noise, p) |>
+  slice_min(true_rss, n = 1, with_ties = FALSE) |>
+  ungroup() |>
+  filter(algebraic_connectivity > 1e-5)
+
+ggplot(
+  best_per_trial |> filter(grepl("knn", graph_type)),
+  aes(
+    x = fusion * noise * sqrt(log(num_edges) / algebraic_connectivity),
+    y = true_rss / (n * p),
+    color = graph_type,
+    shape = factor(p)
+    )
+) +
+  geom_point() +
+  facet_wrap(~noise, scales = "free", labeller = labeller(noise = ~ paste0("sigma=", .x))) +
+  labs(x="Deterministic Oracle Term", y="Mean Squared Error", color = "KNN", shape="p") +
+  theme_minimal() +
+  theme(axis.title=element_text(size=14,face="bold"))
+
+```
+
+```{r}
+
+all_data2 <- tibble(
+  graph_type = character(),
+  oracle = logical(),
+  trial = numeric(),
+  true_rss = numeric(),
+  rss = numeric(),
+  algebraic_connectivity = numeric(),
+  oracle_fusion = numeric(),
+  fusion = numeric(),
+  num_edges = numeric(),
+  n = numeric(),
+  p = numeric(),
+  noise = numeric(),
+  pQp = numeric()
+)
+
+for(trial in 1:length(all_checkers)) {
+  print(trial)
+  dist_mat <- as.matrix(dist(unique(all_checkers[[trial]]$centers)))
+  pQp <- sum(exp(-dist_mat^2 / (4 * (all_checkers[[trial]]$noise^2 * ncol(all_checkers[[trial]]$centers)))) * dist_mat)
+
+  to_combine <- run_for_connectivity(all_checkers[[trial]], function(checker) {
+    full_connectivity(checker$X, rescale = T, uniform = F)
+  }, "full", seq(0, 2000000, 50000)) |>
+    mutate(pQp = pQp)
+  all_data2 <- all_data2 |> rbind(to_combine)
+    
+}
+
+```
+
+```{r}
+
+best_per_trial2 <- all_data2 |> group_by(graph_type, trial, noise, p) |>
+  slice_min(true_rss, n = 1, with_ties = FALSE) |>
+  ungroup() |>
+  filter(algebraic_connectivity > 1e-5)
+
+ggplot(best_per_trial2,
+       aes(
+         x = pQp * sqrt(log(p) / p),
+         y = true_rss / (n * p),
+         color = factor(noise),
+         shape = factor(p)
+       )) +
+  geom_point() +
+  labs(
+    x = "Dominant Data-Dependent Oracle Term",
+    y = "Mean Squared Error",
+    color = "sigma",
+    shape = "p"
+  ) +
+  theme_minimal() +
+  theme(axis.title=element_text(size=14,face="bold"))
+
+
+
+```

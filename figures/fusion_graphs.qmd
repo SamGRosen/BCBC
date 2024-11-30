@@ -1,0 +1,270 @@
+```{r}
+library(BCBC)
+library(tidyverse)
+library(cvxclustr) 
+library(patchwork)
+library(MASS)
+```
+
+```{r}
+transform_w <- function(graph) {
+  num_nodes <- max(graph$unique_edges$from_node, graph$unique_edges$to_node)
+  num_edges <- choose(num_nodes, 2)
+  
+  to_return <- rep(0, num_edges)
+  
+  new_indices <- graph$unique_edges$from_node * (num_nodes - 0.5) + graph$unique_edges$to_node - 0.5 * graph$unique_edges$from_node^2 - num_nodes
+  to_return[new_indices] <- graph$weights
+  
+  to_return
+  
+}
+
+per_cluster <- 30
+
+set.seed(2)
+X <- rbind(
+  mvrnorm(per_cluster, c(1,1), matrix(c(1, 0.5, 0.5, 1), nrow=2)),
+  mvrnorm(per_cluster, c(-2.25,1), matrix(c(1.5, 0.5, 0.5, 1.5), nrow=2)),
+  mvrnorm(per_cluster, c(0,-1.75), matrix(c(1.5, 0, 0, 1.5), nrow=2))
+)
+```
+
+
+```{r}
+gammas <- seq(0, 50, 0.5)
+
+uniform_weight_graph <- full_connectivity(X, rescale = F, uniform = T)
+fully_scaled_weight_graph <- full_connectivity(X, rescale = F, uniform = F, phi = 1)
+knn_uniform_weight_graph <- knn_graph(X, 3, rescale = F, uniform = T)
+knn_scaled_weight_graph <- knn_graph(X, 3, rescale = F, uniform = F, phi = 1)
+
+solutions_for_data <- function(X, weight_graph, gammas) {
+  solutions <- cvxclust_path_admm(t(X), transform_w(weight_graph), gammas)
+
+  to_plot <- tibble(
+    orig_x = numeric(),
+    orig_y = numeric(),
+    new_x = numeric(),
+    new_y = numeric(),
+    gamma = numeric(),
+    index = numeric(),
+    true_cluster = numeric()
+  )
+  
+  for (i in 1:length(gammas)) {
+    to_plot <- rbind(
+      to_plot,
+      tibble(
+        orig_x = X[, 1],
+        orig_y = X[, 2],
+        new_x = solutions$U[[i]][1, ],
+        new_y = solutions$U[[i]][2, ],
+        gamma = rep(gammas[i], nrow(X)),
+        index = 1:nrow(X),
+        true_cluster = rep(c(1, 2, 3), times = 1, each = per_cluster),
+      )
+    )
+  }
+  to_plot
+}
+
+uniform_solutions <- solutions_for_data(X, uniform_weight_graph, gammas)
+fully_scaled_solutions <- solutions_for_data(X, fully_scaled_weight_graph, gammas) 
+knn_uniform_solutions <- solutions_for_data(X, knn_uniform_weight_graph, gammas) 
+knn_scaled_solutions <- solutions_for_data(X, knn_scaled_weight_graph, gammas) 
+
+```
+
+```{r}
+plot_weight_graph <- function(X, communities, weight_graph, show_legend=TRUE, title="") {
+  fused_data <- weight_graph$unique_edges |>
+    mutate(weight = weight_graph$weights,
+           x1 = X[from_node, 1], 
+           x2 = X[to_node, 1],
+           y1 = X[from_node, 2],
+           y2 = X[to_node, 2])
+  
+  to_return <- ggplot(fused_data) +
+    geom_segment(aes(x = x1, y = y1, xend=x2, yend=y2, alpha=weight), linetype = 2) +
+    annotate("point", x = X[, 1], y=X[,2], color = communities, size=2) +
+    theme_minimal() +
+    theme(
+      axis.text.x = element_blank(),
+      axis.text.y = element_blank(),
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      axis.ticks = element_blank()
+    ) +
+    ggtitle(title)
+  
+  if(show_legend) {
+    return(to_return)
+  }
+  to_return + guides(alpha="none")
+}
+
+
+```
+
+
+```{r}
+
+plot_solution_paths <- function(to_plot) {
+  ggplot(to_plot) +
+  geom_path(aes(group=index, x=new_x, y=new_y, color=as.character(true_cluster)), 
+                alpha=0.85, linetype=3) + 
+  geom_point(aes(orig_x, orig_y, color=as.character(true_cluster)), alpha=0.15) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.ticks = element_blank()
+  ) +
+  guides(color = "none")
+}
+
+
+```
+
+```{r}
+plot_solution_paths(uniform_solutions) +
+  plot_weight_graph(X, rep(c(2,3,4), each=nrow(X) / 3), uniform_weight_graph) +
+  plot_annotation(title="Solution path with uniform fully-connected graph",
+                  theme = theme(plot.title = element_text(size = 16)))
+
+ggsave("~/BCBC/figures/uniform.png")
+```
+
+```{r}
+plot_solution_paths(fully_scaled_solutions) +
+  plot_weight_graph(X, rep(c(2,3,4), each=nrow(X) / 3), fully_scaled_weight_graph) +
+  plot_annotation(title="Solution path with Gaussian kernel graph",
+                  theme = theme(plot.title = element_text(size = 16)))
+
+ggsave("~/BCBC/figures/gaussian.png")
+
+```
+
+
+
+
+```{r}
+plot_solution_paths(knn_uniform_solutions) +
+  plot_weight_graph(X, rep(c(2,3,4), each=nrow(X) / 3), knn_uniform_weight_graph) +
+  plot_annotation(title="Solution path with 3-nearest neighbors graph",
+                  theme = theme(plot.title = element_text(size = 16)))
+
+ggsave("~/BCBC/figures/three_knn.png")
+
+```
+
+
+```{r}
+plot_solution_paths(knn_scaled_solutions) +
+  plot_weight_graph(X, rep(c(2,3,4), each=nrow(X) / 3), knn_scaled_weight_graph) +
+  plot_annotation(title="Solution path with Gaussian kernel 3-nearest neighbors graph",
+                  theme = theme(plot.title = element_text(size = 16)))
+
+ggsave("~/BCBC/figures/gaussian_three_knn.png")
+
+```
+
+## High p
+
+```{r}
+per_cluster <- 25
+p <- 100
+set.seed(2)
+
+U = matrix(0, nrow=per_cluster * 3, ncol = p)
+U[1:per_cluster,] = -1
+U[(2 * per_cluster + 1):(3 * per_cluster),] = 1
+
+X_p <- rbind(
+  mvrnorm(per_cluster, rep(-1, p), 2 * diag(p)),
+  mvrnorm(per_cluster, rep(0, p), 2 * diag(p)),
+  mvrnorm(per_cluster, rep(1, p), 2 * diag(p))
+)
+
+```
+
+```{r}
+small_gammas <- seq(0, 20, 1)
+large_gammas <- seq(0, 10000, 500)
+
+uniform_weight_graph <- full_connectivity(X_p, rescale = F, uniform = T)
+fully_scaled_weight_graph <- full_connectivity(X_p, rescale = T, uniform = F)
+knn_uniform_weight_graph <- knn_graph(X_p, 5, rescale = F, uniform = T)
+knn_scaled_weight_graph <- knn_graph(X_p, 5, rescale = T, uniform = F)
+
+best_solution_for_data <- function(X, U, weight_graph, gammas) {
+  solutions <- cvxclust_path_admm(t(X), transform_w(weight_graph), gammas)
+
+  best_mse <- sum((solutions$U[[1]] - t(U))^2)
+  best_index <- 1
+  for (i in 1:length(gammas)) {
+    curr_mse <-  sum((solutions$U[[i]] - t(U))^2)
+    if(curr_mse < best_mse) {
+      best_mse = curr_mse
+      best_index = i
+    }
+  }
+  
+  print(c(best_index, best_mse))
+  t(solutions$U[[best_index]])
+}
+
+uniform_solutions <- best_solution_for_data(X_p, U, uniform_weight_graph, small_gammas)
+fully_scaled_solutions <- best_solution_for_data(X_p, U, fully_scaled_weight_graph, large_gammas) 
+knn_uniform_solutions <- best_solution_for_data(X_p, U, knn_uniform_weight_graph, small_gammas) 
+knn_scaled_solutions <- best_solution_for_data(X_p, U, knn_scaled_weight_graph, large_gammas) 
+
+```
+
+```{r}
+plot_pairwise_distance_matrix <- function(U) {
+  
+}
+
+image(t(knn_uniform_weight_graph$E_row) %*% knn_uniform_weight_graph$E_row)
+image(t(knn_scaled_weight_graph$E_row) %*% knn_scaled_weight_graph$E_row)
+```
+
+## Algebraic Connectivity
+
+```{r}
+algebraic_connectivity <- function(graph) {
+  if(nrow(graph$E_row) < ncol(graph$E_row) - 1) {
+    return(0)
+  }
+  weighted_incidence <- sweep(graph$E_row, 1, sqrt(graph$weights), "*")
+  singular_vals <- svd(weighted_incidence)$d
+  singular_vals[length(singular_vals) - 1]
+}
+
+
+i = 1
+graphs <- list()
+acs <- rep(NA, 4)
+for(k in c(1, 3, 6, 10)) {
+  graphs[[i]] <- knn_graph(X, k, rescale = F, uniform = T)
+  acs[i] <- algebraic_connectivity(graphs[[i]])
+  i <- i + 1
+}
+
+(plot_weight_graph(X, rep(c(2,3,4), each=nrow(X) / 3), graphs[[1]], FALSE, 
+                   sprintf("AC: %1.3f, k = %i", acs[1], 1)) + 
+    theme(plot.title = element_text(size=22))) |
+  (plot_weight_graph(X, rep(c(2,3,4), each=nrow(X) / 3), graphs[[2]], FALSE, 
+                     sprintf("AC: %1.3f, k = %i", acs[2], 3)) + 
+     theme(plot.title = element_text(size=22))) |
+  (plot_weight_graph(X, rep(c(2,3,4), each=nrow(X) / 3), graphs[[3]], FALSE, 
+                     sprintf("AC: %1.3f, k = %i", acs[3], 6)) + 
+     theme(plot.title = element_text(size=22))) |
+  (plot_weight_graph(X, rep(c(2,3,4), each=nrow(X) / 3), graphs[[4]], FALSE, 
+                     sprintf("AC: %1.3f, k = %i", acs[4], 10)) +
+     theme(plot.title = element_text(size=22)))
+```

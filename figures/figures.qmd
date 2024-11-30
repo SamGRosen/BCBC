@@ -150,21 +150,32 @@ ggplot(to_plot) +
 # Biclustering Example
 
 ```{r}
-checker <- gen_checkerboard(300, 300, 10, 10, noise=1.5, shuffle = TRUE, prob_empty = 0.5, scale=FALSE)
+checker <- gen_checkerboard(100, 150, 20, 5, noise=2, shuffle = TRUE, prob_empty = 0.25, scale=FALSE)
 
-ggplot(matrix_to_df2(checker$X), aes(x = order_col, y = order_row)) +
-    geom_raster(aes(fill = value)) +
-    scale_fill_gradient2() +
-    theme_minimal() +
-    theme(axis.text.x = element_blank(),
-          axis.ticks.x = element_blank())
 
-from_palm3 <- tune_bcbc(checker$X, model=palm, lambdas=c(0), gammas=2^seq(10, 15, 0.5), recalculate_weights = TRUE, progress = TRUE)
+rownames(checker$X) <- 1:nrow(checker$X)
+
+col_dist <- as.matrix(dist(t(checker$X)))
+col_dist <- col_dist - min(col_dist[col_dist > 0])
+diag(col_dist) <- 0 
+col_hclust <- hclust(as.dist(col_dist))
+
+ggplot(matrix_fit_to_df(checker$X), aes(x = order_col, y = order_row)) +
+  geom_raster(aes(fill = value)) +
+  scale_fill_gradient2() +
+  guides(fill="none") +
+  geom_dendro(col_hclust, xlim=c(0, 150), ylim=c(101, 130)) +
+  theme_minimal() +
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank())
 
 # devtools::install_github("nicolash2/ggdendroplot")
 
 plot_fit(
-    matrix_to_df(
+    matrix_fit_to_df(
         examplebcbc$U,
         weights = examplebcbc$w,
         labels = examplebcbcdata$row_partition,
