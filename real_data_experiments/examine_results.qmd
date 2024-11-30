@@ -1,93 +1,273 @@
 ```{r}
-source("./RSCobra.R")
-```
+library(BCBC)
+library(clusterSim)
 
-```{r}
-datasets <- c(brain="brain", colon="colon", leuk="leukemia", srbct="srbct", lym="lymphoma")
-```
-
-```{r}
-
-```
-
-```{r}
-brain_y <- read.csv("./data/brain.y.txt", header=FALSE)
-rscobra_brain <- readRDS("./cv_brain.RDS")
-augmented_brain <- augment_cv(rscobra_brain, brain_y$V1)
-```
-
-```{r}
-colon_y <- read.csv("./data/colon.y.txt", header=FALSE)
-# rscobra_colon <- readRDS("./cv_colon.RDS")
-cobra_colon <- readRDS("./cobra_2colon.RDS")
-# augmented_colon <- augment_cv(rscobra_colon, colon_y$V1)
-augmented_colon_cobra <- augment_cobra(cobra_colon, colon_y$V1)
-```
-
-```{r}
-leuk_y <- read.csv("./data/leukemia.y.txt", header=FALSE)
-# rscobra_leuk <- readRDS("./cv_leuk.RDS")
-# augmented_leuk <- augment_cv(rscobra_leuk, leuk_y$V1)
-```
-
-```{r}
-# cobra_leuk <- readRDS("./cobra_leuk.RDS")
-# augmented_leuk_cobra <- augment_cobra(cobra_leuk, leuk_y$V1)
-cobra_leuk2 <- readRDS("./cobra_2leuk.RDS")
-augmented_leuk_cobra2 <- augment_cobra(cobra_leuk2, leuk_y$V1)
-# cobra_leuk3 <- readRDS("./cobra_3leuk.RDS")
-# augmented_leuk_cobra3 <- augment_cobra(cobra_leuk3, leuk_y$V1)
-
-```
-
-```{r}
-palm_leuk <- readRDS("./palm_leuk2.RDS")
-augmented_leuk_palm <- augment_cv(palm_leuk, leuk_y$V1)
-# plot(sort(augmented_leuk_palm$all_runs[[29]]$w))
-```
-
-```{r}
-sparsebc_leuk <- readRDS("./sparsebc_leuk.RDS")
-for (metric in metrics) {
-  print(metric)
-  print(igraph::compare(sparsebc_leuk$Cs, leuk_y$V1, method =
-                      metric))
+eval_cluster <- function(true_labels, fitted_mat, fitted_labels) {
+  print(c("Silhoutte:", index.S(dist(fitted_mat), true_labels)))
+  print(c("DB:", index.DB(fitted_mat, true_labels)$DB))
+  print(c("ARI:",
+        igraph::compare(fitted_labels,
+                        true_labels, method = "adjusted.rand")))
 }
 ```
 
+# SRBCT
+
 ```{r}
-lym_y <- read.csv("./data/lymphoma.y.txt", header=FALSE)
-# cobra_lym <- readRDS("./cobra_lym.RDS")
-# augmented_lym <- augment_cobra(cobra_lym, lym_y$V1)
+srbct <- t(read.csv("./data/srbct.x.txt", header = FALSE, sep = " "))
+# srbct <- scale(srbct)
+srbct_labels <- read.csv("./data/srbct.y.txt", header = FALSE, sep = " ")$V1
+srbct_plot <- plot_fit(matrix_fit_to_df(srbct,
+                                        labels = srbct_labels))
 ```
 
+## BCBC
+
 ```{r}
-palm_lym <- readRDS("./palm_lym.RDS")
-augmented_lym_palm <- augment_cv(palm_lym, lym_y$V1)
+BCBC_srbct_obj <- readRDS("/cwork/sgr26/BCBC_ADAPTIVE_srbct_17525585.RDS")
+BCBC_srbct <- bcbc_extractor(BCBC_srbct_obj)
+BCBC_srbct_plot <- plot_fit(matrix_fit_to_df(BCBC_srbct$fitted_mat,
+                                             labels = srbct_labels))
+eval_cluster(srbct_labels, BCBC_srbct$fitted_mat, BCBC_srbct$row_groups)
 ```
 
-```{r}
-palm_lym2 <- readRDS("./palm_lym_tuned.RDS")
-augmented_lym_palm2 <- augment_cv(palm_lym2, lym_y$V1)
+## BCEL
 
-palm_lym3 <- readRDS("./palm_lym_tuned3.RDS")
-augmented_lym_palm3 <- augment_cv(palm_lym3, lym_y$V1)
+```{r}
+BCEL_srbct <- bcel_extractor(readRDS("/cwork/sgr26/BCEL_srbct_16959587.RDS"))
+BCEL_srbct_plot <- plot_fit(matrix_fit_to_df(BCEL_srbct$fitted_mat,
+                                             labels = srbct_labels))
+eval_cluster(srbct_labels, BCEL_srbct$fitted_mat, BCEL_srbct$row_groups)
 ```
 
+## COBRA
+
 ```{r}
-# srbct_y <- read.csv("./data/srbct.y.txt", header=FALSE)
-# palm_srbct <- readRDS("./palm_srbct.RDS")
-# augmented_srbct_palm <- augment_cv(palm_srbct, srbct_y$V1)
-
-palm_srbct2 <- readRDS("./palm_srbct_tuned.RDS")
-augmented_srbct_palm2 <- augment_cv(palm_srbct2, srbct_y$V1)
-
-cobra_srbct <- readRDS("./cobra_srbct.RDS")
-cobra_augmented_srbct <- augment_cobra(cobra_srbct, srbct_y$V1)
+COBRA_srbct <- cobra_extractor(readRDS("/cwork/sgr26/COBRA_srbct_16959591.RDS"))
+COBRA_srbct_plot <- plot_fit(matrix_fit_to_df(COBRA_srbct$fitted_mat,
+                                              labels = srbct_labels))
+eval_cluster(srbct_labels, COBRA_srbct$fitted_mat, COBRA_srbct$row_groups)
 ```
 
+## SparseBC
+
+
 ```{r}
-prostate_y <- read.csv("./data/prostate.y.txt", header=FALSE)
-palm_prostate <- readRDS("./palm_prostate.RDS")
-augmented_palm_prostate <- augment_cv(palm_prostate, prostate_y$V1)
+SparseBC_srbct <- sparseBC_extractor(readRDS("/cwork/sgr26/SPARSEBC_srbct_17005414.RDS"))
+SparseBC_srbct_plot <- plot_fit(matrix_fit_to_df(SparseBC_srbct$fitted_mat,
+                                                 labels = srbct_labels))
+eval_cluster(srbct_labels, SparseBC_srbct$fitted_mat, SparseBC_srbct$row_groups)
+```
+
+## SCBiclust
+
+```{r}
+SCBiclust_srbct_obj <- readRDS("/cwork/sgr26/SCBICLUST_srbct_17010263.RDS")
+SCBiclust_srbct_fitted_mat <- srbct - SCBiclust_srbct_obj$x.residual
+SCBiclust_srbct <- scbiclust_extractor(SCBiclust_srbct_obj)
+SCBiclust_srbct_plot <- plot_fit(matrix_fit_to_df(SCBiclust_srbct_fitted_mat,
+                                                  labels = srbct_labels))
+eval_cluster(srbct_labels, SCBiclust_srbct_fitted_mat, SCBiclust_srbct$row_groups)
+```
+
+
+# Leukemia
+
+```{r}
+
+leukemia <- t(read.csv("./data/leukemia.x.txt", header = FALSE, sep = " "))
+# leukemia <- scale(leukemia)
+leukemia_labels <- read.csv("./data/leukemia.y.txt", header = FALSE, sep = " ")$V1
+leukemia_plot <- plot_fit(matrix_fit_to_df(leukemia,
+                                           labels = leukemia_labels))
+```
+
+## BCBC
+
+```{r}
+BCBC_leukemia_obj <- readRDS("/cwork/sgr26/BCBC_ADAPTIVE_leukemia_18011281.RDS")
+BCBC_leukemia <- bcbc_extractor(BCBC_leukemia_obj)
+BCBC_leukemia_plot <- plot_fit(matrix_fit_to_df(BCBC_leukemia$fitted_mat,
+                                             labels = leukemia_labels))
+eval_cluster(leukemia_labels, BCBC_leukemia$fitted_mat, BCBC_leukemia$row_groups)
+
+```
+
+## BCEL
+
+```{r}
+BCEL_leukemia <- bcel_extractor(readRDS("/cwork/sgr26/BCEL_leukemia_17013237.RDS"))
+BCEL_leukemia_plot <- plot_fit(matrix_fit_to_df(BCEL_leukemia$fitted_mat,
+                                                labels = leukemia_labels))
+eval_cluster(leukemia_labels, BCEL_leukemia$fitted_mat, BCEL_leukemia$row_groups)
+```
+
+## COBRA
+
+```{r}
+COBRA_leukemia <- cobra_extractor(readRDS("/cwork/sgr26/COBRA_leukemia_17010568.RDS"))
+COBRA_leukemia_plot <- plot_fit(matrix_fit_to_df(COBRA_leukemia$fitted_mat,
+                                                 labels = leukemia_labels))
+igraph::compare(COBRA_leukemia$row_groups, leukemia_labels, method = "adjusted.rand")
+
+```
+
+## SparseBC
+
+```{r}
+SparseBC_leukemia <- sparseBC_extractor(readRDS("/cwork/sgr26/SPARSEBC_leukemia_17013244.RDS"))
+SparseBC_leukemia_plot <- plot_fit(matrix_fit_to_df(SparseBC_leukemia$fitted_mat,
+                                                    labels = leukemia_labels))
+igraph::compare(SparseBC_leukemia$row_groups, leukemia_labels, method = "adjusted.rand")
+```
+
+## SCBiclust
+
+```{r}
+SCBiclust_leukemia_obj <- readRDS("/cwork/sgr26/SCBICLUST_leukemia_17010614.RDS")
+SCBiclust_leukemia <- scbiclust_extractor(SCBiclust_leukemia_obj)
+SCBiclust_leukemia_plot <- plot_fit(matrix_fit_to_df(leukemia - SCBiclust_leukemia_obj$x.residual,
+                                                     labels = leukemia_labels))
+igraph::compare(SCBiclust_leukemia$row_groups, leukemia_labels, method = "adjusted.rand")
+```
+
+# Lymphoma
+
+```{r}
+
+lymphoma <- t(read.csv("./data/lymphoma.x.txt", header = FALSE, sep = " "))
+lymphoma <- scale(lymphoma)
+lymphoma_labels <- read.csv("./data/lymphoma.y.txt", header = FALSE, sep = " ")$V1
+lymphoma_plot <- plot_fit(matrix_fit_to_df(lymphoma,
+                                           labels = lymphoma_labels))
+```
+
+## BCBC
+
+```{r}
+BCBC_lymphoma_obj <- readRDS("/cwork/sgr26/BCBC_ADAPTIVE_lymphoma_18313449.RDS")
+BCBC_lymphoma <- bcbc_extractor(BCBC_lymphoma_obj)
+BCBC_lymphoma_plot <- plot_fit(matrix_fit_to_df(BCBC_lymphoma$fitted_mat,
+                                             labels = lymphoma_labels))
+igraph::compare(BCBC_lymphoma$row_groups, lymphoma_labels, method = "adjusted.rand")
+
+```
+
+## BCEL
+
+```{r}
+BCEL_lymphoma <- bcel_extractor(readRDS("/cwork/sgr26/BCEL_lymphoma_17013238.RDS"))
+BCEL_lymphoma_plot <- plot_fit(matrix_fit_to_df(BCEL_lymphoma$fitted_mat,
+                                                labels = lymphoma_labels))
+igraph::compare(BCEL_lymphoma$row_groups, lymphoma_labels, method = "adjusted.rand")
+```
+
+## COBRA
+
+```{r}
+COBRA_lymphoma <- cobra_extractor(readRDS("/cwork/sgr26/COBRA_lymphoma_17010569.RDS"))
+COBRA_lymphoma_plot <- plot_fit(matrix_fit_to_df(COBRA_lymphoma$fitted_mat,
+                                                 labels = lymphoma_labels))
+igraph::compare(COBRA_lymphoma$row_groups, lymphoma_labels, method = "adjusted.rand")
+
+```
+
+## SparseBC
+
+```{r}
+SparseBC_lymphoma <- sparseBC_extractor(readRDS("/cwork/sgr26/SPARSEBC_lymphoma_17013245.RDS"))
+SparseBC_lymphoma_plot <- plot_fit(matrix_fit_to_df(SparseBC_lymphoma$fitted_mat,
+                                                    labels = lymphoma_labels))
+igraph::compare(SparseBC_lymphoma$row_groups, lymphoma_labels, method = "adjusted.rand")
+```
+
+## SCBiclust
+
+```{r}
+SCBiclust_lymphoma_obj <- readRDS("/cwork/sgr26/SCBICLUST_lymphoma_17010615.RDS")
+SCBiclust_lymphoma <- scbiclust_extractor(SCBiclust_lymphoma_obj)
+SCBiclust_lymphoma_plot <- plot_fit(matrix_fit_to_df(lymphoma - SCBiclust_lymphoma_obj$x.residual,
+                                                     labels = lymphoma_labels))
+igraph::compare(SCBiclust_lymphoma$row_groups, lymphoma_labels, method = "adjusted.rand")
+```
+
+
+
+# Colon
+
+```{r}
+
+colon <- t(read.csv("./data/colon.x.txt", header = FALSE, sep = " "))
+# colon <- scale(colon)
+colon_labels <- read.csv("./data/colon.y.txt", header = FALSE, sep = " ")$V1
+colon_plot <- plot_fit(matrix_fit_to_df(colon,
+                                        labels = colon_labels))
+```
+
+## BCBC
+
+```{r}
+BCBC_colon_obj <- readRDS("/cwork/sgr26/BCBC_ADAPTIVE_colon_17499267.RDS")
+BCBC_colon <- bcbc_extractor(BCBC_colon_obj)
+BCBC_colon_plot <- plot_fit(matrix_fit_to_df(BCBC_colon$fitted_mat,
+                                             labels = colon_labels))
+igraph::compare(BCBC_colon$row_groups, colon_labels, method = "adjusted.rand")
+```
+
+## BCEL
+
+```{r}
+BCEL_colon <- bcel_extractor(readRDS("/cwork/sgr26/BCEL_colon_17013237.RDS"))
+BCEL_colon_plot <- plot_fit(matrix_fit_to_df(BCEL_colon$fitted_mat,
+                                             labels = colon_labels))
+igraph::compare(BCEL_colon$row_groups, colon_labels, method = "adjusted.rand")
+```
+
+## COBRA
+
+```{r}
+COBRA_colon <- cobra_extractor(readRDS("/cwork/sgr26/COBRA_colon_17010568.RDS"))
+COBRA_colon_plot <- plot_fit(matrix_fit_to_df(COBRA_colon$fitted_mat,
+                                              labels = colon_labels))
+igraph::compare(COBRA_colon$row_groups, colon_labels, method = "adjusted.rand")
+
+```
+
+## SparseBC
+
+```{r}
+SparseBC_colon <- sparseBC_extractor(readRDS("/cwork/sgr26/SPARSEBC_colon_17042629.RDS"))
+SparseBC_colon_plot <- plot_fit(matrix_fit_to_df(SparseBC_colon$fitted_mat,
+                                                 labels = colon_labels))
+igraph::compare(SparseBC_colon$row_groups, colon_labels, method = "adjusted.rand")
+```
+
+## SCBiclust
+
+```{r}
+SCBiclust_colon_obj <- readRDS("/cwork/sgr26/SCBICLUST_colon_17010615.RDS")
+SCBiclust_colon <- scbiclust_extractor(SCBiclust_colon_obj)
+SCBiclust_colon_plot <- plot_fit(matrix_fit_to_df(colon - SCBiclust_colon_obj$x.residual,
+                                                     labels = colon_labels))
+igraph::compare(SCBiclust_colon$row_groups, colon_labels, method = "adjusted.rand")
+```
+
+# WangBreast
+
+```{r}
+WangBreast2005 <- t(read.csv("./data/WangBreast2005.txt", header = FALSE, sep = "\t"))
+WangBreast2005 <- scale(WangBreast2005)
+WangBreast2005_labels <- read.csv("./data/WangBreast2005.y.txt", header = FALSE, sep = " ")$V1
+WangBreast2005_plot <- plot_fit(matrix_fit_to_df(WangBreast2005,
+                                                 labels = WangBreast2005_labels))
+```
+
+# Lung
+
+```{r}
+BhattachereeLung2001 <- t(read.csv("./data/BhattacherjeeLung2001.txt", header = FALSE, sep = "\t"))
+BhattachereeLung2001 <- scale(BhattachereeLung2001)
+BhattachereeLung2001_labels <- read.csv("./data/BhattacherjeeLung2001.y.txt", header = FALSE, sep = " ")$V1
+BhattachereeLung2001_plot <- plot_fit(matrix_fit_to_df(BhattachereeLung2001,
+                                                 labels = BhattachereeLung2001_labels))
 ```
