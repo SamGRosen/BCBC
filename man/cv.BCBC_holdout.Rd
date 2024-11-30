@@ -13,9 +13,10 @@ cv.BCBC_holdout(
   k_features = c(2),
   phis = c(0.5),
   recalculate_weights = c(FALSE),
+  approx_neighbors = c(FALSE),
+  hnsw_args = list(),
   tols = c(0.001),
-  tmax_outers = c(50),
-  tmax_inners = c(50),
+  tmax_hierarchy = c(10, 25, 50),
   ...
 )
 }

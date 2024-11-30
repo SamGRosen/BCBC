@@ -24,6 +24,13 @@ gen_checkerboard <- function(n,
                              prob_empty = 0.1,
                              shuffle = TRUE,
                              scale = TRUE) {
+  params <- list(
+    num_row_clusters = num_row_clusters,
+    num_col_clusters = num_col_clusters,
+    p_extra = p_extra,
+    noise = noise,
+    cluster_spread = cluster_spread
+  )
   row_partition <- sort(sample(1:num_row_clusters, n, replace = TRUE))
   col_partition <-
     sort(sample(1:num_col_clusters, p, replace = TRUE))
@@ -78,9 +85,10 @@ gen_checkerboard <- function(n,
                                scale=attr(shuffled_row, "scaled:scale")
       )
     }
-    return(list(X = shuffled_row, centers = shuffled_center,
-                row_partition=row_partition, col_partition=col_partition,
-                zeroed=zeroed, true_features=true_features))
+    return(c(list(X = shuffled_row, centers = shuffled_center,
+                  row_partition=row_partition, col_partition=col_partition,
+                  zeroed=zeroed, true_features=true_features,
+                  col_reorder=col_reorder, row_reorder=row_reorder), params))
   }
   if(scale) {
     data_mat <- scale(data_mat)
@@ -90,7 +98,7 @@ gen_checkerboard <- function(n,
       scale = attr(data_mat, "scaled:scale")
     )
   }
-  return(list(X = data_mat, centers = centers,
-              row_partition=row_partition, col_partition=col_partition,
-              zeroed=zeroed, true_features))
+  return(c(list(X = data_mat, centers = centers,
+                row_partition=row_partition, col_partition=col_partition,
+                zeroed=zeroed, true_features=true_features), params))
 }

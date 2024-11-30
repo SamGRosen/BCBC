@@ -17,6 +17,8 @@ cv.BCBC(
   recalculate_weights = c(TRUE),
   tols = c(1e-06),
   percent_noise = c(0.25),
+  approx_neighbors = c(FALSE),
+  hnsw_args = list(),
   num_row_clusters = NA,
   num_col_clusters = NA,
   ...

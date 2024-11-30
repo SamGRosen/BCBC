@@ -90,9 +90,11 @@ BCBC <- function(X,
                  tmax_outer = 100,
                  tol = 1e-5,
                  recalculate_weights = TRUE,
-                 greedy_terminate = !recalculate_weights,
-                 approx = 0,
-                 progress = TRUE) {
+                 greedy_terminate = FALSE,
+                 approx_neighbors = FALSE,
+                 hnsw_args = list(),
+                 progress = TRUE,
+                 wts = NA) {
   n <- dim(X)[1]
   p <- dim(X)[2]
   U <- X
@@ -108,7 +110,8 @@ BCBC <- function(X,
   w_path <- matrix(NA, nrow = tmax_outer, ncol = p)
   objective_vals <- rep(NA, tmax_outer)
   rss_vals <- rep(NA, tmax_outer)
-
+  row_fusion_vals <- rep(NA, tmax_outer)
+  col_fusion_vals <- rep(NA, tmax_outer)
   if (progress) {
     pb <- txtProgressBar(min = 0,
                          max = tmax_outer,
@@ -120,13 +123,14 @@ BCBC <- function(X,
     U_step <- U - sweep(X - U, 2, w ^ 2 + lambda * w, "*")
     # U_step <- U - sweep(X - U, 2, w, "*")
 
-    if (recalculate_weights || t == 1) {
+    if (recalculate_weights || (t == 1 && !is.list(wts))) {
       wts <- fast_gkn_weights(
         t(U_step),  # Use U_step here since that is the input to COBRA
         k_row = k_features,
         k_col = k_samples,
         phi = phi,
-        approx = approx
+        approximate = approx_neighbors,
+        hnsw_args = hnsw_args
       )
 
       row_fusion <- wts$row_fusion
@@ -136,7 +140,7 @@ BCBC <- function(X,
           "U has diverged, try increasing k_features, k_samples or decreasing phi",
           "arguments to encourage fusion terms.",
           "Returning current step"))
-        rss_vals[t] <- sum(sweep(X - U, 2, w ^ 2 + lambda * w, "*") ^ 2)
+        rss_vals[t] <- sum(sweep(X - U, 2, sqrt(w ^ 2 + lambda * w), "*") ^ 2)
         # rss_vals[t] <- sum(sweep(X - U, 2, w, "*") ^ 2)
         objective_vals[t] <-
           gamma * (row_fusion + col_fusion) + rss_vals[t] / 2
@@ -146,8 +150,10 @@ BCBC <- function(X,
       row_fusion <- calc_fusion_term(wts$unique_row_edges, wts$w_row, U, rows=FALSE)
       col_fusion <- calc_fusion_term(wts$unique_col_edges, wts$w_col, U, rows=TRUE)
     }
+    col_fusion_vals[t] <- col_fusion
+    row_fusion_vals[t] <- row_fusion
 
-    rss_vals[t] <- sum(sweep(X - U, 2, w ^ 2 + lambda * w, "*") ^ 2)
+    rss_vals[t] <- sum(sweep(X - U, 2, sqrt(w ^ 2 + lambda * w), "*") ^ 2)
     # rss_vals[t] <- sum(sweep(X - U, 2, w, "*") ^ 2)
     objective_vals[t] <-
       gamma * (row_fusion + col_fusion) + rss_vals[t] / 2
@@ -212,6 +218,8 @@ BCBC <- function(X,
     w_path = w_path,
     objective = objective_vals,
     rss = rss_vals,
+    row_fusion = row_fusion_vals,
+    col_fusion = col_fusion_vals,
     time = as.numeric(end - start)
   )
 

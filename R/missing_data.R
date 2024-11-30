@@ -24,11 +24,11 @@ BCBC_missing <- function(X,
                          k_features = 4,
                          gamma = 10,
                          phi = 0.05,
-                         tmax_inner = 50,
-                         tmax_outer = 100,
+                         tmax_hierarchy = c(10, 25, 50),
                          tol = 1e-4,
                          recalculate_weights = FALSE,
-                         approx = 0,
+                         approx_neighbors = FALSE,
+                         hnsw_args = list(),
                          progress = FALSE,
                          fusion_weights = NA,
                          return_fit = FALSE) {
@@ -40,9 +40,15 @@ BCBC_missing <- function(X,
 
   missing_columns <- sort(unique(invalid_indices[, 2]))
   stopifnot("missing values must have length > 0"= nrow(invalid_indices) > 0)
+  stopifnot("tmax_hierarchy must have length 3"= length(tmax_hierarchy) == 3)
 
-  filled_vals = matrix(NA, nrow=tmax_outer, ncol=nrow(invalid_indices))
-  w_path = matrix(NA, nrow=tmax_outer, ncol=p)
+  filled_vals = matrix(NA, nrow=tmax_hierarchy[1], ncol=nrow(invalid_indices))
+  row_fusions <- rep(NA, tmax_hierarchy[1])
+  col_fusions <- rep(NA, tmax_hierarchy[1])
+  valid_rss <- rep(NA, tmax_hierarchy[1])
+  valid_weighted_rss <- rep(NA, tmax_hierarchy[1])
+  w_path = matrix(NA, nrow=tmax_hierarchy[1], ncol=p)
+
   U = X
   U[invalid_indices] = mean(X[valid_indices])
   w = rep(1/p, p)
@@ -53,16 +59,17 @@ BCBC_missing <- function(X,
       k_col = k_samples,
       k_row = k_features,
       phi = phi,
-      approx = approx
+      approximate = approx_neighbors,
+      hnsw_args = hnsw_args
     )
   }
 
 
-  for(t in 1:tmax_outer) {
+  for(t in 1:tmax_hierarchy[1]) {
     if (progress) {
       pb <- progress_bar$new(
-        format = paste0(t, "/", tmax_outer, " imputing iter [:bar] :percent"),
-        total = tmax_inner)
+        format = paste0(t, "/", tmax_hierarchy[1], " imputing iter [:bar] :percent"),
+        total = tmax_hierarchy[2])
     } else {
       pb <- NULL
     }
@@ -78,12 +85,17 @@ BCBC_missing <- function(X,
       recalculate_weights = FALSE,
       wts = fusion_wts,
       progress_bar = pb,
-      tmax = tmax_inner,
+      tmax_hierarchy = tmax_hierarchy[2:3],
       tol = tol
     )
     U <- bcbc_result$U
     w <- bcbc_result$w
 
+    valid_rss[t] <- sum((X[valid_indices] - U[valid_indices]) ^ 2)
+    swept_weighted_residuals <- sweep(X - U, 2, sqrt(w ^ 2 + lambda * w), "*") ^ 2
+    valid_weighted_rss[t] <- sum(swept_weighted_residuals[valid_indices])
+    row_fusions[t] <- bcbc_result$row_fusion
+    col_fusions[t] <- bcbc_result$col_fusion
     filled_vals[t, ] <- U[invalid_indices]
     w_path[t, ] <- w
 
@@ -102,6 +114,11 @@ BCBC_missing <- function(X,
       U = ifelse(return_fit, U, NA),
       w = w,
       w_path = w_path,
+      row_fusions = row_fusions,
+      col_fusions = col_fusions,
+      valid_rss = valid_rss,
+      valid_weighted_rss = valid_weighted_rss,
+      objectives = gamma * (row_fusions + col_fusions) + valid_weighted_rss / 2,
       filled_vals = filled_vals,
       invalid_indices = invalid_indices
     )
@@ -116,12 +133,11 @@ BCBC_missing_iter <- function(X,
                               k_features = 4,
                               gamma = 10,
                               phi = 0.05,
-                              tmax = NA,  # Set this to set both below
-                              tmax_cobra = 100,
-                              tmax_outer = 100,
+                              tmax_hierarchy = c(25, 50),
                               tol = 1e-4,
                               recalculate_weights = FALSE,
-                              approx = 0,
+                              approx_neigbors = FALSE,
+                              hnsw_args = FALSE,
                               progress_bar = NA,
                               wts = NULL) {
   n <- dim(X)[1]
@@ -129,15 +145,11 @@ BCBC_missing_iter <- function(X,
   U <- X
   w <- rep(1/p, p)
 
-  if (!is.na(tmax)) {
-    tmax_cobra <- tmax
-    tmax_outer <- tmax
-  }
+  stopifnot("tmax_hierarchy must have length 2"= length(tmax_hierarchy) == 2)
 
   start <- Sys.time()
-  for (t in 1:tmax_outer) {
+  for (t in 1:tmax_hierarchy[1]) {
     U_step <- U - sweep(X - U, 2, w ^ 2 + lambda * w, "*")
-    # U_step <- U - sweep(X - U, 2, w, "*")
 
     U_step[missing_indices] <- U[missing_indices] -
       (X[missing_indices] - U[missing_indices]) *
@@ -149,8 +161,11 @@ BCBC_missing_iter <- function(X,
         k_col = k_samples,
         k_row = k_features,
         phi = phi,
-        approx = approx
+        approximate = approx_neighbors,
+        hnsw_args = hnsw_args
       )
+      row_fusion <- wts$row_fusion
+      col_fusion <- wts$col_fusion
 
       if(min(wts$w_row) <= 0 || min(wts$w_col) <= 0) {
         warning(paste(
@@ -159,6 +174,9 @@ BCBC_missing_iter <- function(X,
           "Returning current step"))
         break
       }
+    } else {
+      row_fusion <- calc_fusion_term(wts$unique_row_edges, wts$w_row, U, rows=FALSE)
+      col_fusion <- calc_fusion_term(wts$unique_col_edges, wts$w_col, U, rows=TRUE)
     }
 
     # Cobra has rows as features, columns as samples
@@ -169,7 +187,7 @@ BCBC_missing_iter <- function(X,
             wts$w_row,
             wts$w_col,
             gamma = gamma,  # Need to double/half gamma?
-            max_iter = tmax_cobra,
+            max_iter = tmax_hierarchy[2],
             tol=tol)
 
     U_prime <- t(cobra_result$U[[1]])
@@ -205,9 +223,10 @@ BCBC_missing_iter <- function(X,
     list(
       U = U,
       w = w,
+      row_fusion = row_fusion,
+      col_fusion = col_fusion,
       lambda = lambda,
       time = as.numeric(end - start)
     )
   )
 }
-

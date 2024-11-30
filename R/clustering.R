@@ -60,8 +60,8 @@ get_row_clusters <- function(mat, threshold) {
 #' @examples
 get_threshold_for_k_components <- function(dist_mat,
                                            k,
-                                           max_threshold = sd(dist_mat),
-                                           maxiter = 25) {
+                                           max_threshold = max(dist_mat),
+                                           maxiter = 50) {
   get_num_components_err <- function(threshold) {
     length(unique(dbscan::comps(frNN(
       dist_mat, threshold, sort = F
@@ -76,6 +76,7 @@ get_threshold_for_k_components <- function(dist_mat,
                   c(0, max_threshold),
                   maxiter = maxiter,
                   tol = 1e-10)
+
   root$root
 }
 
@@ -134,6 +135,8 @@ get_weighted_biclusters <- function(U,
 
   list(
     row_clusters = row_clusters,
-    col_clusters = col_clusters
+    col_clusters = col_clusters,
+    row_threshold = row_threshold,
+    col_threshold = col_threshold
   )
 }

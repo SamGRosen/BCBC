@@ -2,6 +2,26 @@ metrics <- c("vi", "nmi", "split.join", "rand", "adjusted.rand")
 
 #' Title
 #'
+#' @param estimated_clusters
+#' @param true_clusters
+#' @param method
+#'
+#' @return
+#' @export
+#' @importFrom igraph compare
+#'
+#' @examples
+safe_compare <- function(estimated_clusters, true_clusters, method) {
+  if (length(estimated_clusters) != length(true_clusters) ||
+      length(unique(estimated_clusters)) == length(true_clusters)) {
+    return(-1)
+  } else {
+    return(igraph::compare(estimated_clusters, true_clusters, method = method))
+  }
+}
+
+#' Title
+#'
 #' @param cv_obj
 #' @param y_vals
 #' @param columns
@@ -74,7 +94,6 @@ augment_cobra <- function(cobra, y_vals) {
 #' @importFrom dplyr inner_join
 #' @importFrom dplyr distinct
 #' @importFrom tidyr pivot_longer
-#' @import stringr
 #' @export
 #'
 #' @examples
@@ -93,7 +112,7 @@ matrix_fit_to_df <- function(matrix,
   df <- as.data.frame(matrix) |>
     mutate(row_num = row_number()) |>
     pivot_longer(!row_num, names_to = "col_num") |>
-    mutate(col_num = as.numeric(str_replace(col_num, "V", "")))
+    mutate(col_num = as.numeric(sub("V", "", col_num)))
 
   if(length(weights > 0) && cluster_with_weights) {
     w_vals = sqrt(weights^2 + lambda * weights)
@@ -109,24 +128,26 @@ matrix_fit_to_df <- function(matrix,
     inner_join(tibble(
       row_num = h_row$order,
       order_row = 1:length(h_row$order)
-    )) |>
+    ), by = join_by(row_num)) |>
     inner_join(tibble(
       col_num = h_col$order,
       order_col = 1:length(h_col$order)
-    ))
+    ), by = join_by(col_num))
 
   if (is.null(labels)) {
     return(df)
   } else {
     df <- df |>
-      inner_join(tibble(row_num = 1:length(h_row$order), label = labels))
+      inner_join(tibble(row_num = 1:length(h_row$order), label = labels),
+                 by = join_by(row_num))
   }
 
   if (is.null(labels2)) {
     return(df)
   } else {
     df <- df |>
-      inner_join(tibble(row_num = 1:length(h_row$order), label2 = labels2))
+      inner_join(tibble(row_num = 1:length(h_row$order), label2 = labels2,
+                        by = join_by(row_num)))
   }
   return(df)
 }
@@ -192,6 +213,7 @@ plot_fit <- function(plot_df,
       ymin = plot_df$order_row - 0.5,
       ymax = plot_df$order_row + 0.5,
       fill = case_when(
+        plot_df$label == 0 ~ "#11DDDD",
         plot_df$label == 1 ~ "green",
         plot_df$label == 2 ~ "yellow",
         plot_df$label == 3 ~ "purple",
@@ -241,6 +263,15 @@ plot_fit <- function(plot_df,
 }
 
 
+#' Title
+#'
+#' @param w_path
+#' @param reorder
+#'
+#' @return
+#' @export
+#'
+#' @examples
 plot_w_path <- function(w_path, reorder=TRUE) {
   if (any(is.na(w_path[, 1]))) {
     first_NA <- which.max(is.na(w_path[, 1]))
@@ -253,7 +284,7 @@ plot_w_path <- function(w_path, reorder=TRUE) {
   as_df <- as.data.frame(w_path) |>
     mutate(row_num = row_number()) |>
     pivot_longer(!row_num, names_to = "col_num") |>
-    mutate(col_num = as.numeric(str_replace(col_num, "V", "")))
+    mutate(col_num = as.numeric(sub("V", "", col_num)))
 
   ggplot(as_df, aes(col_num, row_num)) +
     geom_raster(aes(fill = value)) +
@@ -278,4 +309,59 @@ plot_w_path <- function(w_path, reorder=TRUE) {
       color = "green"
     ) +
     theme_minimal()
+}
+
+
+#' Title
+#'
+#' @param bcbc_cv_obj
+#' @param num_row_clusters
+#' @param num_col_clusters
+#'
+#' @return
+#' @export
+#'
+#' @examples
+modify_cv <- function(bcbc_cv_obj, num_row_clusters, num_col_clusters) {
+  num_runs <- length(bcbc_cv_obj$all_runs)
+
+  to_cbind <- tibble(
+    row_threshold = numeric(),
+    col_threshold = numeric(),
+    num_row_clusters = numeric(),
+    num_col_clusters = numeric()
+  )
+
+  new_row_clusters <- list()
+  new_col_clusters <- list()
+  for(run in 1:num_runs) {
+    biclusters <- get_weighted_biclusters(bcbc_cv_obj$all_runs[[run]]$U,
+                                          weights = bcbc_cv_obj$all_runs[[run]]$w,
+                                          lambda = bcbc_cv_obj$all_runs[[run]]$lambda,
+                                          num_row_clusters = num_row_clusters,
+                                          num_col_clusters = num_col_clusters)
+    new_row_clusters[[run]] <- biclusters$row_clusters
+    new_col_clusters[[run]] <- biclusters$col_clusters
+
+    to_cbind <- to_cbind |>
+      add_row(
+        num_row_clusters = length(unique(biclusters$row_clusters)),
+        num_col_clusters = length(unique(biclusters$col_clusters)),
+        row_threshold = biclusters$row_threshold,
+        col_threshold = biclusters$col_threshold
+      )
+  }
+
+  bcbc_cv_obj$cv_data <- bcbc_cv_obj$cv_data |>
+    mutate(
+      num_row_clusters = to_cbind$num_row_clusters,
+      num_col_clusters = to_cbind$num_col_clusters,
+      row_threshold = to_cbind$row_threshold,
+      col_threshold = to_cbind$col_threshold
+    )
+
+  bcbc_cv_obj$row_clusters <- new_row_clusters
+  bcbc_cv_obj$col_clusters <- new_col_clusters
+
+  bcbc_cv_obj
 }

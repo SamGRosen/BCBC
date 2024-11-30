@@ -26,9 +26,10 @@ cv.BCBC_holdout <- function(X,
                             k_features = c(2),
                             phis = c(0.5),
                             recalculate_weights = c(FALSE),
+                            approx_neighbors = c(FALSE),
+                            hnsw_args = list(),
                             tols = c(1e-3),
-                            tmax_outers = c(50),
-                            tmax_inners = c(50),
+                            tmax_hierarchy = c(10, 25, 50),
                             ...) {
   all_params <-
     expand.grid(
@@ -36,10 +37,9 @@ cv.BCBC_holdout <- function(X,
       k_samples = k_samples,
       k_features = k_features,
       gamma = gammas,
-      tmax_outer = tmax_outers,
-      tmax_inner = tmax_inners,
       phi = phis,
       recalculate_weights = recalculate_weights,
+      approx_neighbors = approx_neighbors,
       tol = tols
     )
 
@@ -56,7 +56,10 @@ cv.BCBC_holdout <- function(X,
   future_results <- lapply(1:nrow(all_params), function(param_set) {
     params <- all_params[param_set, ]
     print(params)
-    result <- do.call(BCBC_missing, c(list(X = missing_X), params, ...))
+    result <- do.call(BCBC_missing, c(list(X = missing_X,
+                                           tmax_hierarchy = tmax_hierarchy,
+                                           hnsw_args = hnsw_args),
+                                      params, ...))
 
     residuals <- result$filled_vals[nrow(result$filled_vals), ] - heldout_vals
     unique_weights <- result$w_path[nrow(result$w_path), ]

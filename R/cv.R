@@ -27,7 +27,8 @@ get_cv_metrics <- function(X,
     percent_noise = percent_noise
   )
   rss <- sum((X - bcbc_run$U)^2)
-  w2_rss <- sum(bcbc_run$w ^ 2 * colSums(X - bcbc_run$U)^2)
+  w2_rss <- sum(bcbc_run$w ^ 2 * colSums((X - bcbc_run$U)^2))
+  w0 <- sum(bcbc_run$w > 0)
   row_clusters <- weighted_biclusters$row_clusters
   col_clusters <- weighted_biclusters$col_clusters
 
@@ -41,7 +42,9 @@ get_cv_metrics <- function(X,
       num_col_clusters = num_col_clusters,
       rss = rss,
       w2_rss = w2_rss,
-      BIC = n * p * log(w2_rss / n * p) + log(n * p) * num_bi_clusters
+      BIC = n * p * log(w2_rss / n * p) + log(n * p) * num_bi_clusters,
+      BIC_normed = n * p * log(w2_rss / (n * p) * w0 ^ 2) + log(n * p) * num_bi_clusters,
+      w0 = w0
     ),
     row_clusters = row_clusters,
     col_clusters = col_clusters
@@ -132,6 +135,8 @@ cv.BCBC <- function(X,
                     recalculate_weights = c(TRUE),
                     tols = c(1e-6),
                     percent_noise = c(0.25),
+                    approx_neighbors = c(FALSE),
+                    hnsw_args = list(),
                     num_row_clusters = NA,
                     num_col_clusters = NA,
                     ...) {
@@ -147,6 +152,7 @@ cv.BCBC <- function(X,
       tmax_cobra = tmax_cobras,
       phi = phis,
       recalculate_weights = recalculate_weights,
+      approx_neighbors = approx_neighbors,
       tol = tols
     )
 
@@ -163,7 +169,7 @@ cv.BCBC <- function(X,
     function(param_set) {
       params <- all_params[param_set,]
       result <- do.call(BCBC,
-                        c(list(X=X), params, ...))
+                        c(list(X=X, hnsw_args=hnsw_args), params, ...))
 
       cv_metrics <- get_cv_metrics(X,
                                    result,

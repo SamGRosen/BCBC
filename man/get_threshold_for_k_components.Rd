@@ -7,8 +7,8 @@
 get_threshold_for_k_components(
   dist_mat,
   k,
-  max_threshold = sd(dist_mat),
-  maxiter = 25
+  max_threshold = max(dist_mat),
+  maxiter = 50
 )
 }
 \arguments{

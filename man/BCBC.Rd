@@ -16,9 +16,11 @@ BCBC(
   tmax_outer = 100,
   tol = 1e-05,
   recalculate_weights = TRUE,
-  greedy_terminate = !recalculate_weights,
-  approx = 0,
-  progress = TRUE
+  greedy_terminate = FALSE,
+  approx_neighbors = FALSE,
+  hnsw_args = list(),
+  progress = TRUE,
+  wts = NA
 )
 }
 \arguments{
