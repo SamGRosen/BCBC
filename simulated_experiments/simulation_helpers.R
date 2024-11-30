@@ -1,22 +1,22 @@
 library(tidyverse)
 library(BCBC)
-
+library(clusterSim)
 
 generate_checkers <- function(seed=2024) {
   set.seed(seed)
   all_checkers <- list()
 
-  trials <- 20
-  noise_levels <- c(3)
-  extra_dims <- c(0, 50, 100, 250, 500, 1000)
+  trials <- 16
+  noise_levels <- c(8)
+  extra_dims <- c(0, 100, 200, 300, 400, 500, 600, 700, 800, 900)
 
   i <- 1
   for (trial in 1:trials) {
     for (noise_level in noise_levels) {
       for (extra_dim in extra_dims) {
         all_checkers[[i]] <- gen_checkerboard(
-          100,
-          100,
+          200,
+          200,
           5,
           5,
           noise = noise_level,
@@ -26,6 +26,38 @@ generate_checkers <- function(seed=2024) {
         )
         all_checkers[[i]]$noise_level = noise_level
         all_checkers[[i]]$extra_dim = extra_dim
+        all_checkers[[i]]$trial = trial
+        i <- i + 1
+      }
+    }
+  }
+
+  all_checkers
+}
+
+generate_checkers_SNR <- function(seed=2024) {
+  set.seed(seed)
+  all_checkers <- list()
+
+  trials <- 16
+  noise_levels <- c(5, 7.5, 10, 12.5, 15)
+  dimensions <- c(50, 75, 100, 125, 150)
+  i <- 1
+  for (trial in 1:trials) {
+    for (noise_level in noise_levels) {
+      for (dimension in dimensions) {
+        all_checkers[[i]] <- gen_checkerboard(
+          dimension,
+          dimension,
+          5,
+          5,
+          noise = noise_level,
+          cluster_spread = 10,
+          p_extra = 300,
+          prob_empty = 0
+        )
+        all_checkers[[i]]$noise_level = noise_level
+        all_checkers[[i]]$extra_dim = 300
         all_checkers[[i]]$trial = trial
         i <- i + 1
       }
@@ -107,21 +139,12 @@ evaluate_checker <- function(checker,
   } else {
     to_return$largest_group_in_untrue <- NA
   }
+
+
   for (metric in metrics) {
-    if (length(row_groups) != length(checker$row_partition) || to_return$row_group_count == length(checker$row_partition)) {
-      row_result <- -1
-    } else {
-      row_result <- igraph::compare(row_groups, checker$row_partition, method = metric)
-    }
-    if (length(col_groups) != length(checker$col_partition) || to_return$col_group_count == length(checker$col_partition)) {
-      col_result <- -1
-      col_result_true <- -1
-    } else {
-      col_result <- igraph::compare(col_groups, checker$col_partition, method = metric)
-      col_result_true <- igraph::compare(col_groups[true_feature_indices],
-                                         checker$col_partition[true_feature_indices],
-                                         method = metric)
-    }
+    row_result <- safe_compare(row_groups, checker$row_partition, metric)
+    col_result <- safe_compare(col_groups, checker$col_partition, metric)
+    col_result_true <- safe_compare(col_groups[true_feature_indices], checker$col_partition[true_feature_indices], metric)
 
     to_return[[paste(metric, "row", sep = "_")]] <- row_result
     to_return[[paste(metric, "col", sep = "_")]] <- col_result
@@ -130,8 +153,20 @@ evaluate_checker <- function(checker,
 
   if(is.null(fitted_mat)) {
     to_return$true_err <- NA
+    to_return$row_silhouette <- NA
+    to_return$col_silhouette <- NA
+    to_return$row_db <- NA
+    to_return$col_db <- NA
+    to_return$row_ch <- NA
+    to_return$col_ch <- NA
   } else {
     to_return$true_err <- mean((checker$centers - fitted_mat)^2)
+    to_return$row_silhouette <- index.S(dist(fitted_mat), checker$row_partition)
+    to_return$col_silhouette <- index.S(dist(t(fitted_mat)), checker$col_partition)
+    to_return$row_db <- index.DB(fitted_mat, checker$row_partition)$DB
+    to_return$col_db <- index.DB(t(fitted_mat), checker$col_partition)$DB
+    to_return$row_ch <- index.G1(fitted_mat, checker$row_partition)
+    to_return$col_ch <- index.G1(t(fitted_mat), checker$col_partition)
   }
 
   to_return
@@ -164,24 +199,24 @@ get_all_checker_results <- function(all_checkers, all_results, extractor) {
 }
 
 bcbc_extractor <- function(bcbc_result) {
-  best_run <- bcbc_result$cv$cv_data |> slice(which.min(BIC))
+  best_run <- bcbc_result$bcbc_cv$cv_data |> slice(which.min(BIC))
   best_index <- best_run$index
   list(
-    row_groups = bcbc_result$cv$row_clusters[[best_index]],
-    col_groups = bcbc_result$cv$col_clusters[[best_index]],
-    fitted_mat = bcbc_result$cv$all_runs[[best_index]]$U,
-    fitted_feature_coefs = bcbc_result$cv$all_runs[[best_index]]$w
+    row_groups = bcbc_result$bcbc_cv$row_clusters[[best_index]],
+    col_groups = bcbc_result$bcbc_cv$col_clusters[[best_index]],
+    fitted_mat = bcbc_result$bcbc_cv$all_runs[[best_index]]$U,
+    fitted_feature_coefs = bcbc_result$bcbc_cv$all_runs[[best_index]]$w
   )
 }
 
 cobra_extractor <- function(cobra_result) {
-  cobra_clusters = get_weighted_biclusters(t(cobra_result$U),
-                                           weights = 1,
-                                           percent_noise = 0.25)
+  cobra_clusters = get_weighted_biclusters(t(cobra_result$U[[1]]),
+                                           weights = NA,
+                                           percent_noise = 0.5)
   list(
     col_groups = cobra_clusters$col_clusters,
     row_groups = cobra_clusters$row_clusters,
-    fitted_mat = t(cobra_result$U)
+    fitted_mat = t(cobra_result$U[[1]])
   )
 }
 

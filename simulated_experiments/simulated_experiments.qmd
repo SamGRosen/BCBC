@@ -9,7 +9,7 @@ library(SCBiclust)
 library(future.apply)
 
 # install.packages("../BCEL", repos = NULL, type="source")
-library(BCEL)  # https://github.com/SamGRosen/BCEL, need to compile from source
+# library(BCEL)  # https://github.com/SamGRosen/BCEL, need to compile from source
 
 plan(sequential, split=TRUE)
 ```
@@ -17,111 +17,8 @@ plan(sequential, split=TRUE)
 # Data
 
 ```{r}
-set.seed(2024)
 SAVE_RESULTS = TRUE
-all_checkers <- list()
-
-trials <- 20
-noise_levels <- c(3)
-extra_dims <- c(0, 50, 100, 250, 500, 1000)
-
-i <- 1
-for(trial in 1:trials) {
-  for (noise_level in noise_levels) {
-    for (extra_dim in extra_dims) {
-      all_checkers[[i]] <- gen_checkerboard(
-        100,
-        100,
-        5,
-        5,
-        noise = noise_level,
-        cluster_spread = 10,
-        p_extra = extra_dim,
-        prob_empty = 0
-      )
-      all_checkers[[i]]$noise_level = noise_level
-      all_checkers[[i]]$extra_dim = extra_dim
-      all_checkers[[i]]$trial = trial
-      i <- i + 1
-    }
-  }
-}
-
-```
-
-# BiCobra
-
-```{r}
-all_bcbc_results = list()
-for(checker in 1:length(all_checkers)) {
-  print(c(checker, as.character(Sys.time())))
-  all_bcbc_results[[checker]] <-
-    cv.BCBC(
-      all_checkers[[checker]]$X,
-      lambdas = 2 ^ seq(-8,-4, 1),
-      gammas = 2 ^ seq(1, 12, 2),
-      progress = FALSE,
-      scale_gamma = TRUE,
-      recalculate_weights = TRUE,
-      tol=1e-4,
-      percent_noise = 0.25
-    )
-}
-
-if(SAVE_RESULTS) {
-  saveRDS(all_bcbc_results, paste0("./rds_files/all_bcbc_results", Sys.time(), ".RDS"))
-}
-```
-
-# Cobra
-
-```{r}
-all_cobra_results = list()
-for(checker in 1:length(all_checkers)) {
-  print(c(checker, as.character(Sys.time())))
-  wts <- fast_gkn_weights(
-    t(all_checkers[[checker]]$X),
-    k_row = 2,
-    k_col = 2,
-    phi = 0.5,
-    approx = 0
-  )
-  
-  all_cobra_results[[checker]] <-
-    cobra_validate(
-      t(all_checkers[[checker]]$X),
-      wts$E_row,
-      wts$E_col,
-      wts$w_row,
-      wts$w_col,
-      gamma = 2 ^ seq(3, 16, 0.25),
-      max_iter = 500
-    )
-}
-
-if(SAVE_RESULTS) {
-  saveRDS(all_cobra_results, paste0("./rds_files/all_cobra_results", Sys.time(), ".RDS"))
-}
-```
-
-# BCEL
-
-```{r}
-all_bcel_results = list()
-for(checker in 1:length(all_checkers)) {
-  print(c(checker, as.character(Sys.time())))
-
-  all_bcel_results[[checker]] <-
-    bcel_stable(
-      all_checkers[[checker]]$X,
-      r = 5
-    )
-  break
-}
-
-if(SAVE_RESULTS) {
-  saveRDS(all_bcel_results, paste0("./rds_files/all_bcel_results", Sys.time(), ".RDS"))
-}
+all_checkers <- generate_checkers(2024)
 ```
 
 # S4VD
@@ -177,7 +74,7 @@ for(checker in 1:length(all_checkers)) {
 }
 
 if(SAVE_RESULTS) {
-  saveRDS(all_sparsebc_results, paste0("./rds_files/all_sparsebc_results", Sys.time(), ".RDS"))
+  saveRDS(all_sparsebc_results, paste0("./rds_files/all_sparsebc_results_SNR", Sys.time(), ".RDS"))
 }
 ```
 
@@ -196,7 +93,7 @@ for(checker in 1:length(all_checkers)) {
 }
 
 if(SAVE_RESULTS) {
-  saveRDS(all_scbiclust_results, paste0("./rds_files/all_scbiclust_results", Sys.time(), ".RDS"))
+  saveRDS(all_scbiclust_results, paste0("./rds_files/all_scbiclust_results_SNR", Sys.time(), ".RDS"))
 }
 
 ```
@@ -215,12 +112,38 @@ for (checker in 1:length(all_checkers)) {
       method = BCPlaid(),
       background = FALSE,
       max.layers = 25,
-      iter.layer = 100,
-      iter.startup = 100,
-      row.release = 0.7,
-      col.release = 0.7,
+      iter.layer = 200,
+      iter.startup = 200,
+      row.release = 0.3,
+      col.release = 0.3,
       verbose = FALSE
     )
+  
+  if(length(all_bcplaid_results[[checker]]@RowxNumber) == 1) {
+    print(checker)
+    all_bcplaid_results[[checker]] <-
+      biclust(
+        all_checkers[[checker]]$X,
+        method = BCPlaid(),
+        background = FALSE,
+        max.layers = 25,
+        iter.layer = 400,
+        iter.startup = 400,
+        row.release = 0.1,
+        col.release = 0.1,
+        verbose = FALSE
+      )
+  }
+  
+  if(length(all_bcplaid_results[[checker]]@RowxNumber) == 1) {
+    print(checker)
+    all_bcplaid_results[[checker]]@RowxNumber <- matrix(TRUE, 
+                                                        nrow = nrow(all_checkers[[checker]]$X), 
+                                                        ncol = 1)
+    all_bcplaid_results[[checker]]@NumberxCol <- matrix(TRUE, 
+                                                    nrow = 1, 
+                                                    ncol = ncol(all_checkers[[checker]]$X))
+  }
 }
 
 if(SAVE_RESULTS) {
@@ -285,8 +208,8 @@ for(checker in 1:length(all_checkers)) {
     maxiter = 100
   )
 
-  row_groups <- dbscan::comps(frNN(row_dist, row_threshold, sort = F))
-  col_groups <- dbscan::comps(frNN(col_dist, row_threshold, sort = F))
+  row_groups <- dbscan::comps(dbscan::frNN(row_dist, row_threshold, sort = F))
+  col_groups <- dbscan::comps(dbscan::frNN(col_dist, row_threshold, sort = F))
   all_threshold_results[[checker]] <- list(
     row_groups = row_groups,
     col_groups = col_groups,
@@ -295,6 +218,6 @@ for(checker in 1:length(all_checkers)) {
 }
 
 if(SAVE_RESULTS) {
-  saveRDS(all_threshold_results, paste0("./simulated_experiments/rds_files/all_threshold_results", Sys.time(), ".RDS"))
+  saveRDS(all_threshold_results, paste0("./rds_files/all_threshold_results", Sys.time(), ".RDS"))
 }
 ```

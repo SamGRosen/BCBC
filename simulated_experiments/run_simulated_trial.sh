@@ -12,7 +12,8 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/x86_64-linux-gnu/
 
 pwd
 
-echo $SLURM_JOB_OD
+echo $SLURM_JOB_ID
+echo $SLURM_ARRAY_JOB_ID
 echo $SLURM_ARRAY_TASK_ID
 echo $METHOD
 

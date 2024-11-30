@@ -9,67 +9,63 @@ library(BCBC)
 source("./simulation_helpers.R")
 ```
 
-# Generate Data
+## Generate Data
 
 ```{r}
 all_checkers <- generate_checkers(2024)
-
 ```
 
-# Results
+## Results
 
 ```{r}
 all_results <- bind_rows(list(
-  # dct = get_all_checker_results(
-  #   all_checkers,
-  #   readRDS(
-  #     "~/BCBC/simulated_experiments/rds_files/all_dct_results2024-07-06 22:27:39.468014.RDS"
-  #   ),
-  #   dct_extractor
-  # ),
+  DTC = get_all_checker_results(
+    all_checkers,
+    readRDS(
+      "~/BCBC/simulated_experiments/rds_files/all_dct_results2024-10-18 15:14:29.848718.RDS"
+    ),
+    dct_extractor
+  ),
   # threshold = get_all_checker_results(
   #   all_checkers,
   #   readRDS(
-  #     "~/BCBC/simulated_experiments/rds_files/all_threshold_results2024-07-18 22:28:20.912642.RDS"
+  #     "~/BCBC/simulated_experiments/rds_files/all_threshold_results2024-10-18 15:27:07.112123.RDS"
   #   ),
   #   dct_extractor
   # ),
-  # s4vd = get_all_checker_results(
-  #   all_checkers,
-  #   readRDS(
-  #     "~/BCBC/simulated_experiments/rds_files/all_s4vd_results2024-07-08 00:03:53.9684.RDS"
-  #   ),
-  #   biclust_extractor
-  # ),
-  # scbiclust = get_all_checker_results(
-  #   all_checkers,
-  #   readRDS(
-  #     "~/BCBC/simulated_experiments/rds_files/all_scbiclust_results2024-07-08 15:39:25.273867.RDS"
-  #   ),
-  #   scbiclust_extractor
-  # ),
-  # bcplaid = get_all_checker_results(
-  #   all_checkers,
-  #   readRDS(
-  #     "~/BCBC/simulated_experiments/rds_files/all_bcplaid_results2024-07-08 15:35:47.120661.RDS"
-  #   ),
-  #   biclust_extractor
-  # ),
-  # sparsebc = get_all_checker_results(
-  #   all_checkers,
-  #   readRDS(
-  #     "~/BCBC/simulated_experiments/rds_files/all_sparsebc_results2024-07-08 15:52:03.199444.RDS"
-  #   ),
-  #   sparseBC_extractor
-  # ),
-  # cobra = read.csv("~/BCBC/simulated_experiments/rds_files/cobra2024-07-08.csv"),
-  # bcel = read.csv("~/BCBC/simulated_experiments/rds_files/BCEL_.csv"),
-  bcbc_no_scale = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_NO_SCALE_15517188.csv"),
-  bcbc_no_scalerss = read.csv("~/BCBC/simulated_experiments/rds_files/rssBCBC_NO_SCALE_15517188.csv"),
-  bcbc_no_scalewbic = read.csv("~/BCBC/simulated_experiments/rds_files/wbic_BCBC_NO_SCALE_15517188.csv"),
-  bcbc_no_scalebic = read.csv("~/BCBC/simulated_experiments/rds_files/bicBCBC_NO_SCALE_15517188.csv"),
-  bcbc_no_scaleotherbic = read.csv("~/BCBC/simulated_experiments/rds_files/otherbicBCBC_NO_SCALE_15517188.csv"),
-  bcbc_no_scale_or_adapt = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_NO_SCALE_OR_ADAPT_15517256.csv")
+  S4VD = get_all_checker_results(
+    all_checkers,
+    readRDS(
+      "~/BCBC/simulated_experiments/rds_files/all_s4vd_results2024-10-18 14:28:38.089409.RDS"
+    ),
+    biclust_extractor
+  ),
+  SCBiclust = get_all_checker_results(
+    all_checkers,
+    readRDS(
+      "~/BCBC/simulated_experiments/rds_files/all_scbiclust_results2024-10-18 15:13:16.317519.RDS"
+    ),
+    scbiclust_extractor
+  ),
+  PLAID = get_all_checker_results(
+    all_checkers,
+    readRDS(
+      "~/BCBC/simulated_experiments/rds_files/all_bcplaid_results2024-11-29 19:31:22.307164.RDS"
+    ),
+    biclust_extractor
+  ),
+  SparseBC = get_all_checker_results(
+    all_checkers,
+    readRDS(
+      "~/BCBC/simulated_experiments/rds_files/all_sparsebc_results2024-10-18 15:05:36.032485.RDS"
+    ),
+    sparseBC_extractor
+  ),
+  COBRA = read.csv("~/BCBC/simulated_experiments/rds_files/COBRA_18012756.csv"),
+  BCEL = read.csv("~/BCBC/simulated_experiments/rds_files/BCEL_18012755.csv"),
+  `Adaptive BCBC` = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_NO_SCALE_18185279.csv"),
+  BCBC = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_NO_SCALE_OR_ADAPT_18372190.csv"),
+  `ANN BCBC` = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_ADAPT_APPROX_18244966.csv")
 ),
 .id = "algorithm")
 
@@ -78,69 +74,184 @@ all_results <- bind_rows(list(
 ```{r}
 se_filtered <- function(vals) {
   vals <- vals[is.finite(vals)]
-  mean((vals - mean(vals))^2) / sqrt(length(vals))
+  sd(vals) / sqrt(length(vals))
 }
 
 se <- function(vals) {
-  mean((vals - mean(vals))^2) / sqrt(length(vals))
+  sd(vals) / sqrt(length(vals))
 }
 
 mean_filtered <- function(vals) {
   mean(vals[is.finite(vals)])
 }
 
-all_results[all_results == -1] = NA
-
+all_results <- all_results |>
+  mutate(
+    adjusted.rand_row = pmax(0, adjusted.rand_row),
+    adjusted.rand_col_true = pmax(0, adjusted.rand_col_true),
+    adjusted.rand_col = pmax(0, adjusted.rand_col)
+  )
+  
 squash_trials <- all_results |>
-  group_by(p, algorithm) |>
-  # summarise(across(row_group_count:true_err, list(mean=mean, se=se)))
-  summarise(across(feature_recall:adjusted.rand_col_true, list(mean=mean_filtered, se=se_filtered)))
+  group_by(p, extra_dim, algorithm) |>
+  summarise(across(feature_recall:col_ch, list(mean=mean, se=se)))
 
-row_ari <- ggplot(squash_trials, aes(x=p, y=adjusted.rand_row_mean, color=algorithm)) +
+plot_methods <- function(metric, label=metric) {
+  ggplot(squash_trials, aes(x=extra_dim, y=.data[[paste0(metric, "_mean")]], color=algorithm)) +
   geom_line() +
-  geom_errorbar(aes(ymin = adjusted.rand_row_mean - 1.96*adjusted.rand_row_se,
-                    ymax = adjusted.rand_row_mean + 1.96*adjusted.rand_row_se)) + 
-  labs(y = "Row ARI", x="p") + 
+  geom_point() +
+  geom_ribbon(aes(ymin = .data[[paste0(metric, "_mean")]] - 1.96 * .data[[paste0(metric, "_se")]],
+                  ymax = .data[[paste0(metric, "_mean")]] + 1.96 * .data[[paste0(metric, "_se")]],
+                  fill = algorithm),
+              alpha = 0.25, linetype = "blank") + 
+  labs(y = label, x = "Extra Noisy Features") + 
+  scale_color_brewer(palette = "Paired") +
+  scale_fill_brewer(palette = "Paired") +
+  scale_x_continuous(breaks = seq(0, 900, 100)) + 
   theme_minimal()
-row_ari
+}
 
+plot_methods("adjusted.rand_row", "Row ARI")
+ggsave("~/BCBC/simulated_experiments/figures/row_ari.png")
 
-col_true_ari <- ggplot(squash_trials,
-                       aes(x = p, y = adjusted.rand_col_true_mean, color = algorithm)) +
-  geom_line() +
-  geom_errorbar(
-    aes(
-      ymin = adjusted.rand_col_true_mean - 1.96 * adjusted.rand_col_true_se,
-      ymax = adjusted.rand_col_true_mean + 1.96 * adjusted.rand_col_true_se
-    )
-  ) +
-  labs(y = "True Column ARI", x = "p") +
-  theme_minimal()
+plot_methods("adjusted.rand_col_true", "True Column ARI")
+ggsave("~/BCBC/simulated_experiments/figures/true_col_ari.png")
 
-col_true_ari
-col_ari <- ggplot(squash_trials,
-                  aes(x = p, y = adjusted.rand_col_mean, color = algorithm)) +
-  geom_line() +
-  geom_errorbar(
-    aes(
-      ymin = adjusted.rand_col_mean - 1.96 * adjusted.rand_col_se,
-      ymax = adjusted.rand_col_mean + 1.96 * adjusted.rand_col_se
-    )
-  ) +
-  labs(y = "Column ARI", x = "p") +
-  theme_minimal()
-col_ari
+plot_methods("adjusted.rand_col", "All Column ARI")
+ggsave("~/BCBC/simulated_experiments/figures/col_ari.png")
 
-ggplot(squash_trials, aes(x=p, y=feature_f1_mean, color=algorithm)) +
-  geom_line() +
-  geom_errorbar(aes(ymin = feature_f1_mean - 1.96*feature_f1_se,
-                    ymax = feature_f1_mean + 1.96*feature_f1_se))
+plot_methods("true_err", "Error")
+plot_methods("feature_f1", "F1 Score")
+plot_methods("row_silhouette")
+plot_methods("col_silhouette")
+
 ```
 
 
 ```{r}
-ggplot(all_results ,
-         # filter(algorithm %in% c("bcbc_no_scale", "bcbc_no_scale_or_adapt")),
-       aes(x=factor(p), y=feature_auc, color=algorithm)) +
-  geom_boxplot()
+ggplot(all_results |>
+         filter(grepl("BCBC", algorithm)) |>
+         filter(extra_dim > 0),
+       aes(x=factor(extra_dim), y=feature_auc, color=algorithm)) +
+  geom_boxplot() +
+  labs(y = "AUC Score", x = "Extra Noisy Features") + 
+  scale_color_brewer(palette = "Paired") +
+  theme_minimal()
+
+ggsave("~/BCBC/simulated_experiments/figures/auc.png")
+```
+
+
+# SNR Experiments
+
+```{r}
+all_checkers_SNR <- generate_checkers_SNR2(2024)
+```
+
+```{r}
+all_results_SNR <- bind_rows(list(
+  # DTC = get_all_checker_results(
+  #   all_checkers,
+  #   readRDS(
+  #     "~/BCBC/simulated_experiments/rds_files/all_dct_results2024-10-25 19:05:42.938786.RDS"
+  #   ),
+  #   dct_extractor
+  # ),
+  # threshold = get_all_checker_results(
+  #   all_checkers,
+  #   readRDS(
+  #     "~/BCBC/simulated_experiments/rds_files/all_threshold_results2024-10-18 15:27:07.112123.RDS"
+  #   ),
+  #   dct_extractor
+  # ),
+  # S4VD = get_all_checker_results(
+  #   all_checkers,
+  #   readRDS(
+  #     "~/BCBC/simulated_experiments/rds_files/all_s4vd_results2024-10-18 14:28:38.089409.RDS"
+  #   ),
+  #   biclust_extractor
+  # ),
+  SCBiclust = get_all_checker_results(
+    all_checkers_SNR,
+    readRDS(
+      "~/BCBC/simulated_experiments/rds_files/all_scbiclust_results_SNR2024-10-29 00:08:32.100258.RDS"
+    ),
+    scbiclust_extractor
+  ),
+  # PLAID = get_all_checker_results(
+  #   all_checkers,
+  #   readRDS(
+  #     "~/BCBC/simulated_experiments/rds_files/all_bcplaid_results2024-10-18 15:53:21.090657.RDS"
+  #   ),
+  #   biclust_extractor
+  # ),
+  SparseBC = get_all_checker_results(
+    all_checkers_SNR,
+    readRDS(
+      "~/BCBC/simulated_experiments/rds_files/all_sparsebc_results_SNR2024-10-29 00:01:34.844837.RDS"
+    ),
+    sparseBC_extractor
+  ),
+  # COBRA = read.csv("~/BCBC/simulated_experiments/rds_files/COBRA_18439720.csv"),
+  BCEL = read.csv("~/BCBC/simulated_experiments/rds_files/BCEL_18588917.csv"),
+  `Adaptive BCBC` = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_NO_SCALE_18571880.csv"),
+  BCBC = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_NO_SCALE_OR_ADAPT_18571881.csv"),
+  `ANN BCBC` = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_ADAPT_APPROX_18571882.csv")
+),
+.id = "algorithm")
+```
+
+
+```{r}
+
+all_results_SNR <- all_results_SNR |>
+  mutate(
+    adjusted.rand_row = pmax(0, adjusted.rand_row),
+    adjusted.rand_col_true = pmax(0, adjusted.rand_col_true),
+    adjusted.rand_col = pmax(0, adjusted.rand_col)
+  )
+
+squash_trials_SNR <- all_results_SNR |>
+  group_by(p, noise_level, n, algorithm) |>
+  summarise(across(feature_recall:col_ch, list(mean=mean, se=se)))
+
+```
+
+```{r}
+
+ggplot(squash_trials_SNR, aes(x = factor(n), y = factor(noise_level))) +
+  geom_tile(aes(fill = adjusted.rand_row_mean)) +
+  geom_text(aes(label = round(adjusted.rand_row_mean, digits = 3))) +
+  geom_text(aes(label = paste0("(", round(adjusted.rand_row_se, digits = 3), ")")), nudge_y = -0.25, size=2) +
+  labs("sigma", "Samples", fill="Row ARI") +
+  scale_fill_viridis_c(breaks=seq(0, 1, 0.15)) +
+  facet_wrap(~algorithm) +
+  theme_minimal()
+  
+  
+
+ggplot(all_results_SNR, aes(x = factor(noise_level), y = adjusted.rand_row)) +
+  geom_boxplot(aes(color=factor(algorithm))) +
+  facet_wrap(~n)
+
+ggplot(squash_trials_SNR, aes(x = noise_level, y = adjusted.rand_col_mean)) +
+  geom_line(aes(color=factor(algorithm))) +
+  facet_wrap(~n)
+
+ggplot(all_results_SNR, aes(x = adjusted.rand_row, y = adjusted.rand_col_true)) +
+  geom_point(aes(color=factor(algorithm), shape=factor(noise_level))) +
+  facet_wrap(~n)
+
+```
+
+```{r}
+ggplot(all_results_SNR |>
+         filter(grepl("BCBC", algorithm)),
+       aes(x=factor(noise_level), y=feature_auc, color=algorithm)) +
+  geom_boxplot() +
+  labs(y = "AUC Score", x = "Noise Level") + 
+  theme_minimal() +
+  scale_color_brewer(palette = "Paired") +
+  facet_wrap(~n)
+
 ```
