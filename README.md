@@ -1,2 +1,3 @@
-# BCC
-Codes for Biconvex Clustering
+# BCBC
+
+Code for Biconvex Biclustering
