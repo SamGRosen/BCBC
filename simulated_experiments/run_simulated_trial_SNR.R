@@ -2,9 +2,6 @@ library(dplyr)
 library(BCBC)
 source("~/BCBC/simulated_experiments/simulation_helpers.R")
 
-options(warn = 1)
-
-
 args <- commandArgs(trailingOnly = TRUE)
 
 print(args)
@@ -15,26 +12,24 @@ JOB_ID <- args[1]
 ARRAY_ID <- as.integer(args[2])
 METHOD <- args[3]
 
-all_checkers <- generate_checkers(2024)
+all_checkers <- generate_checkers_SNR(2024)
 
 if(is.null(all_checkers[[ARRAY_ID]])) {
   stop(paste("Array ID is invalid for checkers", ARRAY_ID, length(all_checkers)))
 }
 
 matched_algo <- match(toupper(METHOD), c("BCBC_NO_SCALE", "BCBC_NO_SCALE_OR_ADAPT",
-                                         "BCBC_ADAPT_APPROX", "BCEL", "COBRA",
-                                         "COBRA_PREPROCESS"))
+                                         "BCBC_ADAPT_APPROX", "BCEL", "COBRA"))
 
 n <- nrow(all_checkers[[ARRAY_ID]]$X)
 p <- ncol(all_checkers[[ARRAY_ID]]$X)
 k_samples <- 5
 k_features <- 5
 phi <- 1
-lambdas <- seq(0, 100, 3) / p
-gammas = n * 1.5 ^ seq(-4, 4, 1)
+lambdas <- seq(0, 50, 1.5) / p
+gammas = n * 1.5 ^ seq(-4, 4, 0.5)
 
 holdout_out_tmax_hierarchy = c(2, 200, 200)
-
 fit_tmax_hierarchy = holdout_out_tmax_hierarchy[2:3]
 
 debug = TRUE
@@ -69,7 +64,7 @@ if(matched_algo == 1) {
     recalculate_weights = TRUE,
     tols = c(1e-4),
     tmax_outer = fit_tmax_hierarchy[1],
-    tmax_cobra = fit_tmax_hierarchy[2]
+    tmax_cobra = fit_tmax_hierarchy[2],
   )
 } else if(matched_algo == 2) {
   result <- cv.BCBC_holdout(
@@ -101,7 +96,7 @@ if(matched_algo == 1) {
     percent_noise = seq(0.025, 0.25, 0.025),
     tols = c(1e-4),
     tmax_outer = 300, # fit_tmax_hierarchy[1],
-    tmax_cobra = 200 # fit_tmax_hierarchy[2],
+    tmax_cobra = 200  # fit_tmax_hierarchy[2],
   )
 } else if(matched_algo == 3) {
   result <- cv.BCBC_holdout(
@@ -159,7 +154,7 @@ if(matched_algo == 1) {
     approx = 0
   )
 
-  gammas <- 2 ^ seq(-3, 15, 0.25)
+  gammas <- 2 ^ seq(3, 15.5, 0.25)
   gamma_cv <-
     cobra_validate(
       t(all_checkers[[ARRAY_ID]]$X),
@@ -168,8 +163,7 @@ if(matched_algo == 1) {
       wts$w_row,
       wts$w_col,
       gamma = gammas,
-      max_iter = 2000,
-      fraction = 0.25
+      max_iter = 500
     )
 
   best_gamma <- gammas[which.min(gamma_cv$validation_error)]
@@ -182,52 +176,8 @@ if(matched_algo == 1) {
       wts$w_row,
       wts$w_col,
       gamma = best_gamma,
-      max_iter = 2000
+      max_iter = 500
     )
-} else if(matched_algo == 6) {
-  gammas <- 2 ^ seq(-3, 15, 0.25)
-
-  top_k_indices <- function(vec, k) {
-    order(vec, decreasing = TRUE)[1:k]
-  }
-
-  scales <- attr(all_checkers[[ARRAY_ID]]$X, "scaled:scale")
-  top_200 <- top_k_indices(scales, 200)
-
-  X_prime <- all_checkers[[ARRAY_ID]]$X[, top_200]
-  wts <- fast_gkn_weights(
-    t(X_prime),
-    k_row = k_features,
-    k_col = k_samples,
-    phi = phi,
-    approx = 0
-  )
-
-  gamma_cv <-
-    cobra_validate(
-      t(X_prime),
-      wts$E_row,
-      wts$E_col,
-      wts$w_row,
-      wts$w_col,
-      gamma = gammas,
-      max_iter = 2000,
-      fraction = 0.25
-    )
-
-  best_gamma <- gammas[which.min(gamma_cv$validation_error)]
-
-  result <-
-    cobra(
-      t(X_prime),
-      wts$E_row,
-      wts$E_col,
-      wts$w_row,
-      wts$w_col,
-      gamma = best_gamma,
-      max_iter = 2000
-    )
-  result$top_200 <- top_200
 } else {
   stop(c("Invalid args:", args))
 }

@@ -1,8 +1,8 @@
-library(tidyverse)
+library(dplyr)
 library(BCBC)
 library(clusterSim)
 
-generate_checkers <- function(seed=2024) {
+generate_checkers <- function(seed=2024, only=NA) {
   set.seed(seed)
   all_checkers <- list()
 
@@ -14,6 +14,10 @@ generate_checkers <- function(seed=2024) {
   for (trial in 1:trials) {
     for (noise_level in noise_levels) {
       for (extra_dim in extra_dims) {
+        if(!is.na(only) && i != only) {
+          i <- i + 1
+          next
+        }
         all_checkers[[i]] <- gen_checkerboard(
           200,
           200,
@@ -24,8 +28,6 @@ generate_checkers <- function(seed=2024) {
           p_extra = extra_dim,
           prob_empty = 0
         )
-        all_checkers[[i]]$noise_level = noise_level
-        all_checkers[[i]]$extra_dim = extra_dim
         all_checkers[[i]]$trial = trial
         i <- i + 1
       }
@@ -56,14 +58,43 @@ generate_checkers_SNR <- function(seed=2024) {
           p_extra = 300,
           prob_empty = 0
         )
-        all_checkers[[i]]$noise_level = noise_level
-        all_checkers[[i]]$extra_dim = 300
         all_checkers[[i]]$trial = trial
         i <- i + 1
       }
     }
   }
 
+  all_checkers
+}
+
+generate_checkers_equal <- function(seed=2024) {
+  set.seed(seed)
+  all_checkers <- list()
+  trials <- 1
+
+  noise_levels <- c(1, 2, 5, 10)
+  cluster_spreads <- c(5, 10, 20, 50)
+  i <- 1
+  for (trial in 1:trials) {
+    for (cluster_spread in cluster_spreads) {
+      for (noise_level in noise_levels) {
+        all_checkers[[i]] <- gen_checkerboard(
+          100,
+          100,
+          5,
+          5,
+          noise = noise_level,
+          cluster_spread = cluster_spread,
+          p_extra = 300,
+          prob_empty = 0,
+          equally_spaced = TRUE,
+          shuffle = FALSE
+        )
+        all_checkers[[i]]$trial = trial
+        i <- i + 1
+      }
+    }
+  }
   all_checkers
 }
 
@@ -86,19 +117,26 @@ overlap_to_groups <- function(row_memberships, col_memberships) {
     left_join(unique_col_groups, by = colnames(col_membership_df)) |>
     dplyr::select(group)
 
+  bicluster_assignments <- matrix(0, nrow=nrow(row_memberships), ncol=ncol(col_memberships))
+  for(biclust_id in 1:ncol(row_memberships)) {
+    indices <- expand.grid(which(row_memberships[, biclust_id]), which(col_memberships[biclust_id, ]))
+    bicluster_assignments[indices[, 1], indices[, 2]] <- biclust_id
+  }
   list(
     row_groups = row_groups$group,
     col_groups = col_groups$group,
+    bicluster_assignments = bicluster_assignments,
     fitted_mat = NULL
   )
 }
+
 
 metrics <- c("vi", "nmi", "split.join", "rand", "adjusted.rand")
 evaluate_checker <- function(checker,
                              fitted_mat,
                              row_groups,
                              col_groups,
-                             fitted_feature_coefs = NA) {
+                             fitted_feature_coefs = NA, ...) {
   to_return <- list()
   to_return$row_group_count <- length(unique(row_groups))
   to_return$col_group_count <- length(unique(col_groups))
@@ -141,14 +179,23 @@ evaluate_checker <- function(checker,
   }
 
 
+  checker_biclusters <- outer(checker$row_partition, checker$col_partition, paste)
+  true_biclusters <- outer(checker$row_partition, checker$col_partition[true_feature_indices], paste)
+  assigned_biclusters <- outer(row_groups, col_groups, paste)
+  assigned_biclusters_true <- outer(row_groups, col_groups[true_feature_indices], paste)
   for (metric in metrics) {
     row_result <- safe_compare(row_groups, checker$row_partition, metric)
     col_result <- safe_compare(col_groups, checker$col_partition, metric)
     col_result_true <- safe_compare(col_groups[true_feature_indices], checker$col_partition[true_feature_indices], metric)
 
+    bicluster_result <- safe_compare(assigned_biclusters, checker_biclusters, metric)
+    bicluster_result_true <- safe_compare(assigned_biclusters_true, true_biclusters, metric)
+
     to_return[[paste(metric, "row", sep = "_")]] <- row_result
     to_return[[paste(metric, "col", sep = "_")]] <- col_result
     to_return[[paste(metric, "col_true", sep = "_")]] <- col_result_true
+    to_return[[paste(metric, "bicluster", sep = "_")]] <- bicluster_result
+    to_return[[paste(metric, "bicluster_true", sep = "_")]] <- bicluster_result_true
   }
 
   if(is.null(fitted_mat)) {
@@ -175,11 +222,14 @@ evaluate_checker <- function(checker,
 get_all_checker_results <- function(all_checkers, all_results, extractor) {
   all_info <- NULL
   for(run in 1:length(all_checkers)) {
+    if(run > length(all_results) || is.null(all_results[[run]])) {
+      next
+    }
     evaluated_info <- do.call(evaluate_checker,
                               c(list(checker = all_checkers[[run]]), extractor(all_results[[run]])))
     new_row <- as_tibble_row(
       c(evaluated_info,
-        noise_level = all_checkers[[run]]$noise_level,
+        noise_level = all_checkers[[run]]$noise,
         trial = all_checkers[[run]]$trial,
         extra_dim = all_checkers[[run]]$extra_dim,
         true_row_num = length(unique(all_checkers[[run]]$row_partition)),
@@ -199,24 +249,56 @@ get_all_checker_results <- function(all_checkers, all_results, extractor) {
 }
 
 bcbc_extractor <- function(bcbc_result) {
-  best_run <- bcbc_result$bcbc_cv$cv_data |> slice(which.min(BIC))
-  best_index <- best_run$index
+  cv_obj <- bcbc_result$lambda_cv
+  best_run <- cv_obj$cv_data |>
+    filter(is.finite(eBIC2)) |>
+    slice(which.min(eBIC2))
+  best_param_index <- best_run$param_index
+  best_cluster_index <- best_run$index
+
+  if(nrow(best_run) == 0) { # all BICs are -Inf
+    best_run = cv_obj$cv_data[1,] # pick first run
+    best_param_index <- best_run$param_index
+    best_cluster_index <- best_run$index
+  }
+
   list(
-    row_groups = bcbc_result$bcbc_cv$row_clusters[[best_index]],
-    col_groups = bcbc_result$bcbc_cv$col_clusters[[best_index]],
-    fitted_mat = bcbc_result$bcbc_cv$all_runs[[best_index]]$U,
-    fitted_feature_coefs = bcbc_result$bcbc_cv$all_runs[[best_index]]$w
+    row_groups = cv_obj$row_clusters[[best_cluster_index]],
+    col_groups = cv_obj$col_clusters[[best_cluster_index]],
+    fitted_mat = cv_obj$all_runs[[best_param_index]]$U,
+    fitted_feature_coefs = cv_obj$all_runs[[best_param_index]]$w
   )
 }
 
 cobra_extractor <- function(cobra_result) {
-  cobra_clusters = get_weighted_biclusters(t(cobra_result$U[[1]]),
-                                           weights = NA,
-                                           percent_noise = 0.5)
+  cobra_clusters = unweighted_bicluster_assignments(
+    t(cobra_result$U[[1]]),
+    percent_noise = 0.25)
   list(
     col_groups = cobra_clusters$col_clusters,
     row_groups = cobra_clusters$row_clusters,
     fitted_mat = t(cobra_result$U[[1]])
+  )
+}
+
+cobra_preprocess_extractor <- function(cobra_result) {
+  U = t(cobra_result$U[[1]])
+  hopefully_p = ceiling(max(cobra_result$top_200) / 100) * 100
+  empty = matrix(0, nrow=nrow(U), ncol = hopefully_p)
+  print(dim(empty))
+  empty[, cobra_result$top_200] = U
+  weights = rep(0, hopefully_p)
+  weights[cobra_result$top_200] = 1/200
+
+  cobra_clusters = bicluster_assignments(empty,
+                                         weights = weights,
+                                         lambda = 0,
+                                         percent_noise = 0.25)
+  list(
+    col_groups = cobra_clusters$col_clusters,
+    row_groups = cobra_clusters$row_clusters,
+    fitted_mat = empty,
+    fitted_feature_coefs = weights
   )
 }
 

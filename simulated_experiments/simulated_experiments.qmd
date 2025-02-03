@@ -37,9 +37,12 @@ for(checker in 1:length(all_checkers)) {
       pcerv = 1,
       pceru = 1,
       nbiclust = 25,
+      row.min = min(table(all_checkers[[checker]]$row_partition)),
+      col.min = min(table(all_checkers[[checker]]$col_partition)),
       iter = 1000,
       gamm = 1,
       merr = 1e-4,
+      start.iter = 20,
       ss.thr = c(0, 1)
     )
 }
@@ -53,20 +56,40 @@ if(SAVE_RESULTS) {
 
 ```{r}
 run_sparsebc <- function(X, gammas) {
+    kr <-
+    sparseBC.choosekr(
+      X,
+      k = 3:6,
+      r = 3:6,
+      lambda = 0,
+      percent = 0.125,
+      TRUE
+    )
+
+  print(kr)
+
+  if(is.null(kr$estimated_kr)) {
+    best_k <- kr$bestK
+    best_r <- kr$bestR
+  } else {
+    best_k <- kr$estimated_kr[1, 1]
+    best_r <- kr$estimated_kr[1, 2]
+  }
+  
   lambda <- sparseBC.BIC(X,
-                         5,
-                         5,
+                         best_k,
+                         best_r,
                          gammas)
   
   sparsebc_fit <- sparseBC(X,
-                           5,
-                           5,
+                           best_k,
+                           best_r,
                            lambda$lambda)
   sparsebc_fit
 }
 
 all_sparsebc_results = list()
-for(checker in 1:length(all_checkers)) {
+for(checker in 1:66) {
   print(c(checker, as.character(Sys.time())))
 
   all_sparsebc_results[[checker]] <-
@@ -74,26 +97,26 @@ for(checker in 1:length(all_checkers)) {
 }
 
 if(SAVE_RESULTS) {
-  saveRDS(all_sparsebc_results, paste0("./rds_files/all_sparsebc_results_SNR", Sys.time(), ".RDS"))
+  saveRDS(all_sparsebc_results, paste0("./rds_files/all_sparsebc_results_with_cv", Sys.time(), ".RDS"))
 }
 ```
 
 # SCBiclust
 
 ```{r}
-all_scbiclust_results = list()
-for(checker in 1:length(all_checkers)) {
-  print(c(checker, as.character(Sys.time())))
-
-  all_scbiclust_results[[checker]] <-
-    PermBiclust.sigclust_stop(all_checkers[[checker]]$X,
-                              sc = FALSE,
-                              silent = TRUE,
-                              maxnum.bicluster = 5)
-}
+# all_scbiclust_results = list()
+# for(checker in 1:length(all_checkers)) {
+#   print(c(checker, as.character(Sys.time())))
+# 
+#   all_scbiclust_results[[checker]] <-
+#     PermBiclust.sigclust_stop(all_checkers[[checker]]$X,
+#                               sc = FALSE,
+#                               silent = TRUE,
+#                               maxnum.bicluster = 6)
+# }
 
 if(SAVE_RESULTS) {
-  saveRDS(all_scbiclust_results, paste0("./rds_files/all_scbiclust_results_SNR", Sys.time(), ".RDS"))
+  saveRDS(all_scbiclust_results, paste0("./rds_files/all_scbiclust_results_cv", Sys.time(), ".RDS"))
 }
 
 ```
@@ -164,12 +187,12 @@ for(checker in 1:length(all_checkers)) {
 
   cut_tree_check <-
     cutreeDynamic(hclust(checker_dist),
-                  minClusterSize = 12,
+                  minClusterSize = min(table(all_checkers[[checker]]$row_partition)),
                   distM = as.matrix(checker_dist))
   
   cut_tree_check_col <-
     cutreeDynamic(hclust(checker_dist_col),
-                  minClusterSize = 12,
+                  minClusterSize = min(table(all_checkers[[checker]]$col_partition)),
                   distM = as.matrix(checker_dist_col))
   all_dct_results[[checker]] <- list(
     row_groups = cut_tree_check,

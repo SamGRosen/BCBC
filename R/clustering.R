@@ -1,34 +1,3 @@
-centroid_rows <- function(mat, mat_for_dist, threshold, calculate_centroids=TRUE) {
-  to_return <- matrix(NA, nrow=nrow(mat), ncol=ncol(mat))
-  row_clusters <- dbscan::comps(frNN(mat_for_dist, threshold, sort=F))
-  names(row_clusters) <- 1:nrow(mat)
-  sorted_membership <- sort(row_clusters)
-  node_indices <- as.integer(names(sorted_membership))
-
-  if(!calculate_centroids) {
-    return(list(mat = to_return, cluster_info = row_clusters))
-  }
-
-  cluster_sizes <- table(row_clusters)
-  curr_index <- 1
-
-  for (cluster_id in names(cluster_sizes)) {
-    cluster_size <- cluster_sizes[cluster_id]
-    cluster_members <-
-      node_indices[curr_index:(curr_index + cluster_size - 1)]
-    if (cluster_size > 1) {
-      centroid <- colSums(mat[cluster_members,]) / cluster_size
-      to_return[cluster_members,] <-
-        rep(centroid, each = cluster_size)
-    }
-
-    curr_index <- curr_index + cluster_size
-  }
-
-  return(list(mat = to_return, cluster_info = row_clusters))
-}
-
-
 #' Title
 #'
 #' @param mat
@@ -40,9 +9,15 @@ centroid_rows <- function(mat, mat_for_dist, threshold, calculate_centroids=TRUE
 #'
 #' @examples
 get_row_clusters <- function(mat, threshold) {
-  clustering <- centroid_rows(mat, mat, threshold, calculate_centroids = FALSE)
+  if (is.null(threshold) ||
+      is.na(threshold) || threshold < 0) {
+    warning(paste("threshold is invalid:", threshold))
+    threshold <- 0
+  }
+  row_clusters <- dbscan::comps(frNN(mat, threshold, sort=F))
+  names(row_clusters) <- 1:nrow(mat)
 
-  return(clustering$cluster_info)
+  row_clusters
 }
 
 
@@ -58,10 +33,10 @@ get_row_clusters <- function(mat, threshold) {
 #' @export
 #'
 #' @examples
-get_threshold_for_k_components <- function(dist_mat,
-                                           k,
-                                           max_threshold = max(dist_mat),
-                                           maxiter = 50) {
+threshold_for_k_components <- function(dist_mat,
+                                       k,
+                                       max_threshold = max(dist_mat),
+                                       maxiter = 50) {
   get_num_components_err <- function(threshold) {
     length(unique(dbscan::comps(frNN(
       dist_mat, threshold, sort = F
@@ -93,19 +68,29 @@ get_threshold_for_k_components <- function(dist_mat,
 #' @export
 #'
 #' @examples
-get_weighted_biclusters <- function(U,
-                                    weights=NA,
-                                    lambda=NA,
-                                    num_row_clusters=NA,
-                                    num_col_clusters=NA,
-                                    percent_noise=0.25) {
+bicluster_assignments <- function(U,
+                                  weights=NA,
+                                  lambda=NA,
+                                  num_row_clusters=NA,
+                                  num_col_clusters=NA,
+                                  percent_noise=0.25) {
   n = nrow(U)
   p = ncol(U)
+
+  non_zero <- which(weights > 0)
+  if(length(non_zero) < 2) {
+    warning(paste("Given weights are invalid", paste(weights, collapse = " ")))
+    weights = rep(0, p)
+    weights[1] = 1/2
+    weights[2] = 1/2
+    non_zero <- which(weights > 0)
+  }
+
   if(any(is.na(weights))) {
     weights <- rep(1, p)
     lambda <- NA
   }
-  non_zero <- which(weights > 0)
+
   non_zero_w <- weights[non_zero]
 
   if(is.finite(lambda)) {
@@ -113,18 +98,18 @@ get_weighted_biclusters <- function(U,
   }
 
   removed <- U[, non_zero]
-  weighted_and_removed <- sweep(removed, 2, non_zero_w, "*")
+  weighted_and_removed <- sweep(removed, 2, sqrt(non_zero_w), "*")
 
   if(is.na(num_row_clusters)) {
     row_threshold <- sd(dist(weighted_and_removed)) * percent_noise
   } else {
-    row_threshold <- get_threshold_for_k_components(dist(weighted_and_removed),
+    row_threshold <- threshold_for_k_components(dist(weighted_and_removed),
                                                     num_row_clusters)
   }
   if(is.na(num_col_clusters)) {
     col_threshold <- sd(dist(t(removed))) * percent_noise
   } else {
-    col_threshold <- get_threshold_for_k_components(dist(t(removed)),
+    col_threshold <- threshold_for_k_components(dist(t(removed)),
                                                     num_col_clusters)
   }
   row_clusters <- get_row_clusters(weighted_and_removed, row_threshold)
@@ -139,4 +124,82 @@ get_weighted_biclusters <- function(U,
     row_threshold = row_threshold,
     col_threshold = col_threshold
   )
+}
+
+#' Title
+#'
+#' @param U
+#' @param num_row_clusters
+#' @param num_col_clusters
+#' @param percent_noise
+#'
+#' @return
+#' @export
+#'
+#' @examples
+unweighted_bicluster_assignments <- function(U,
+                                             num_row_clusters = NA,
+                                             num_col_clusters = NA,
+                                             percent_noise = 0.25) {
+
+  n = nrow(U)
+  p = ncol(U)
+
+  if(is.na(num_row_clusters)) {
+    row_threshold <- sd(dist(U)) * percent_noise
+  } else {
+    row_threshold <- threshold_for_k_components(dist(U),
+                                                    num_row_clusters)
+  }
+  if(is.na(num_col_clusters)) {
+    col_threshold <- sd(dist(t(U))) * percent_noise
+  } else {
+    col_threshold <- threshold_for_k_components(dist(t(U)),
+                                                    num_col_clusters)
+  }
+  row_clusters <- get_row_clusters(U, row_threshold)
+  col_clusters_non_zero <- get_row_clusters(t(U), col_threshold)
+
+  col_clusters <- col_clusters_non_zero
+
+  list(
+    row_clusters = row_clusters,
+    col_clusters = col_clusters,
+    row_threshold = row_threshold,
+    col_threshold = col_threshold
+  )
+}
+
+#' Title
+#'
+#' @param X
+#' @param row_clusters
+#' @param col_clusters
+#'
+#' @return
+#' @export
+#'
+#' @examples
+bicluster_centers <- function(X, row_clusters, col_clusters) {
+  bicluster_assignments <- outer(row_clusters, col_clusters, paste)
+  bicluster_assignments[, col_clusters == 0] <- "0, 0"
+
+  as_df <- tibble(
+    row = rep(1:nrow(X), each = ncol(X)),
+    col = rep(1:ncol(X), nrow(X)),
+    assignment = as.vector(bicluster_assignments),
+    value = as.vector(X)
+  )
+
+  num_groups <- length(unique(as_df$assignment))
+  group_means <- as_df |>
+    group_by(assignment) |>
+    mutate(val = mean(value)) |>
+    ungroup()
+
+  fitted <- matrix(group_means$val, nrow=nrow(X), ncol=ncol(X))
+  return(list(
+    fit = fitted,
+    assignments = bicluster_assignments
+  ))
 }

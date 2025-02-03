@@ -9,6 +9,8 @@
 #' @param prob_empty between 0 and 1, probability a bicluster is 0
 #' @param shuffle randomly reorder rows and columns
 #' @param scale the resulting matrix
+#' @param cluster_spread range of possible cluster spread
+#' @param equally_spaced try to make the cluster centers have equal pairwise distances
 #'
 #' @return
 #' @export
@@ -23,23 +25,33 @@ gen_checkerboard <- function(n,
                              cluster_spread = 5,
                              prob_empty = 0.1,
                              shuffle = TRUE,
-                             scale = TRUE) {
-  params <- list(
+                             scale = TRUE,
+                             equally_spaced = FALSE) {
+  return_append <- list(
     num_row_clusters = num_row_clusters,
     num_col_clusters = num_col_clusters,
     p_extra = p_extra,
     noise = noise,
-    cluster_spread = cluster_spread
+    cluster_spread = cluster_spread,
+    prob_empty = prob_empty,
+    equally_spaced = FALSE
   )
   row_partition <- sort(sample(1:num_row_clusters, n, replace = TRUE))
   col_partition <-
     sort(sample(1:num_col_clusters, p, replace = TRUE))
 
-  mu_kr <- matrix(
-    runif(num_row_clusters * num_col_clusters, -cluster_spread, cluster_spread),
-    nrow = num_row_clusters,
-    ncol = num_col_clusters
-  )
+  if(equally_spaced) {
+    stopifnot("number of row and column clusters must be equal for equal space" =
+                num_row_clusters==num_col_clusters)
+    mu_kr <- banded_matrix(num_row_clusters,
+                           seq(-cluster_spread, cluster_spread, length.out=num_row_clusters))
+  } else {
+    mu_kr <- matrix(
+      runif(num_row_clusters * num_col_clusters, -cluster_spread, cluster_spread),
+      nrow = num_row_clusters,
+      ncol = num_col_clusters
+    )
+  }
 
   zeroed <- matrix(
     rbinom(num_row_clusters * num_col_clusters, 1, 1-prob_empty),
@@ -71,25 +83,20 @@ gen_checkerboard <- function(n,
   if (shuffle) {
     col_reorder <- sample(p + p_extra)
     row_reorder <- sample(n)
-    shuffled_col <- data_mat[, col_reorder]
-    shuffled_center <- centers[, col_reorder]
-    shuffled_row <- shuffled_col[row_reorder,]
-    shuffled_center <- centers[row_reorder,]
+    return_append <- c(return_append,
+                       list(col_reorder=col_reorder, row_reorder=row_reorder))
+
+    data_mat <- data_mat[, col_reorder]
+    centers <- centers[, col_reorder]
+    data_mat <- data_mat[row_reorder,]
+    centers <- centers[row_reorder,]
     row_partition <- row_partition[row_reorder]
     col_partition <- col_partition[col_reorder]
     true_features <- true_features[col_reorder]
-    if(scale) {
-      shuffled_row <- scale(shuffled_row)
-      shuffled_center <- scale(shuffled_center,
-                               center=attr(shuffled_row, "scaled:center"),
-                               scale=attr(shuffled_row, "scaled:scale")
-      )
-    }
-    return(c(list(X = shuffled_row, centers = shuffled_center,
-                  row_partition=row_partition, col_partition=col_partition,
-                  zeroed=zeroed, true_features=true_features,
-                  col_reorder=col_reorder, row_reorder=row_reorder), params))
   }
+  disjoint_biclusters <- outer(row_partition, col_partition, paste)
+  biclusters <- disjoint_biclusters
+  biclusters[, true_features == 0] <- "0, 0"
   if(scale) {
     data_mat <- scale(data_mat)
     centers <- scale(
@@ -100,5 +107,17 @@ gen_checkerboard <- function(n,
   }
   return(c(list(X = data_mat, centers = centers,
                 row_partition=row_partition, col_partition=col_partition,
-                zeroed=zeroed, true_features=true_features), params))
+                zeroed=zeroed, true_features=true_features,
+                disjoint_biclusters=disjoint_biclusters,
+                biclusters=biclusters), return_append))
+}
+
+
+banded_matrix <- function(size, elements) {
+  to_return = matrix(0, nrow=size, ncol=size)
+  for(off_dim in -(size - 1):(size - 1)) {
+    to_return[row(to_return) == col(to_return) + off_dim] = elements[abs(off_dim) + 1]
+  }
+
+  to_return
 }

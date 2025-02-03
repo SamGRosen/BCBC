@@ -48,7 +48,17 @@ calc_fusion_term <- function(edges, weights, U, rows=TRUE) {
   return(sum(weights * all_distances))
 }
 
-debias_w <- function(col_sum_sq, lambda) {
+
+#' Title
+#'
+#' @param col_sum_sq Sum of squared errors for columns
+#' @param lambda
+#'
+#' @return
+#' @export
+#'
+#' @examples
+w_coordinate_descent <- function(col_sum_sq, lambda) {
   f = function(alpha) {
     s = sum(pmax(alpha / col_sum_sq - lambda, 0))
     return(s / 2 - 1)
@@ -57,6 +67,7 @@ debias_w <- function(col_sum_sq, lambda) {
 
   pmax(alpha / col_sum_sq - lambda, 0) / 2
 }
+
 
 #' Title
 #'
@@ -72,8 +83,10 @@ debias_w <- function(col_sum_sq, lambda) {
 #' @param tol
 #' @param recalculate_weights
 #' @param greedy_terminate
-#' @param approx
+#' @param approx_neighbors
+#' @param hnsw_args
 #' @param progress
+#' @param fusion_wts
 #'
 #' @return
 #' @export
@@ -84,7 +97,7 @@ BCBC <- function(X,
                  k_features = 4,
                  k_samples = 4,
                  gamma = 10,
-                 phi = 0.05,
+                 phi = 1,
                  tmax = NA, # Set this to set both below
                  tmax_cobra = 100,
                  tmax_outer = 100,
@@ -94,11 +107,15 @@ BCBC <- function(X,
                  approx_neighbors = FALSE,
                  hnsw_args = list(),
                  progress = TRUE,
-                 wts = NA) {
+                 fusion_wts = NA,
+                 init_U = X) {
   n <- dim(X)[1]
   p <- dim(X)[2]
-  U <- X
+  U <- init_U
   w <- rep(1/p, p)
+
+  best_obj_w <- NA
+  U_for_best_obj <- NA
 
   if (!is.na(tmax)) {
     tmax_cobra <- tmax
@@ -112,6 +129,8 @@ BCBC <- function(X,
   rss_vals <- rep(NA, tmax_outer)
   row_fusion_vals <- rep(NA, tmax_outer)
   col_fusion_vals <- rep(NA, tmax_outer)
+  col_residuals <- matrix(NA, nrow = tmax_outer, ncol = p)
+
   if (progress) {
     pb <- txtProgressBar(min = 0,
                          max = tmax_outer,
@@ -119,13 +138,24 @@ BCBC <- function(X,
   }
 
   start <- Sys.time()
-  for (t in 1:tmax_outer) {
-    U_step <- U - sweep(X - U, 2, w ^ 2 + lambda * w, "*")
-    # U_step <- U - sweep(X - U, 2, w, "*")
 
-    if (recalculate_weights || (t == 1 && !is.list(wts))) {
-      wts <- fast_gkn_weights(
-        t(U_step),  # Use U_step here since that is the input to COBRA
+  if(!is.list(fusion_wts)) {  # If not given first iteration weights, calculate them
+    fusion_wts <- fast_gkn_weights(
+      t(X),
+      k_row = k_features,
+      k_col = k_samples,
+      phi = phi,
+      approximate = approx_neighbors,
+      hnsw_args = hnsw_args
+    )
+  }
+
+  for (t in 1:tmax_outer) {
+    U_step <- U - sweep(U - X, 2, w ^ 2 + lambda * w, "*")
+
+    if (recalculate_weights && t > 1) {
+      fusion_wts <- fast_gkn_weights(
+        t(U_step),  # After first step, use U_step here since that is the input to COBRA
         k_row = k_features,
         k_col = k_samples,
         phi = phi,
@@ -133,30 +163,32 @@ BCBC <- function(X,
         hnsw_args = hnsw_args
       )
 
-      row_fusion <- wts$row_fusion
-      col_fusion <- wts$col_fusion
-      if(min(wts$w_row) <= 0 || min(wts$w_col) <= 0) {
+      row_fusion <- fusion_wts$row_fusion
+      col_fusion <- fusion_wts$col_fusion
+      if(min(fusion_wts$w_row) <= 0 || min(fusion_wts$w_col) <= 0) {
         warning(paste(
           "U has diverged, try increasing k_features, k_samples or decreasing phi",
           "arguments to encourage fusion terms.",
           "Returning current step"))
         rss_vals[t] <- sum(sweep(X - U, 2, sqrt(w ^ 2 + lambda * w), "*") ^ 2)
-        # rss_vals[t] <- sum(sweep(X - U, 2, w, "*") ^ 2)
         objective_vals[t] <-
           gamma * (row_fusion + col_fusion) + rss_vals[t] / 2
         break
       }
     } else {
-      row_fusion <- calc_fusion_term(wts$unique_row_edges, wts$w_row, U, rows=FALSE)
-      col_fusion <- calc_fusion_term(wts$unique_col_edges, wts$w_col, U, rows=TRUE)
+      row_fusion <- calc_fusion_term(fusion_wts$unique_row_edges, fusion_wts$w_row, U, rows=FALSE)
+      col_fusion <- calc_fusion_term(fusion_wts$unique_col_edges, fusion_wts$w_col, U, rows=TRUE)
     }
     col_fusion_vals[t] <- col_fusion
     row_fusion_vals[t] <- row_fusion
 
     rss_vals[t] <- sum(sweep(X - U, 2, sqrt(w ^ 2 + lambda * w), "*") ^ 2)
-    # rss_vals[t] <- sum(sweep(X - U, 2, w, "*") ^ 2)
-    objective_vals[t] <-
-      gamma * (row_fusion + col_fusion) + rss_vals[t] / 2
+    objective_vals[t] <- gamma * (row_fusion + col_fusion) + rss_vals[t] / 2
+
+    if(which.min(objective_vals) == t) {
+      best_obj_w <- w
+      U_for_best_obj <- U
+    }
 
     if(t > 1 && greedy_terminate && objective_vals[t] > objective_vals[t-1]) {
       break
@@ -165,10 +197,10 @@ BCBC <- function(X,
     # Cobra has rows as features, columns as samples
     cobra_result <-
       cobra(t(U_step),
-            wts$E_row,
-            wts$E_col,
-            wts$w_row,
-            wts$w_col,
+            fusion_wts$E_row,
+            fusion_wts$E_col,
+            fusion_wts$w_row,
+            fusion_wts$w_col,
             gamma = gamma,
             max_iter = tmax_cobra,
             tol=tol)
@@ -183,6 +215,8 @@ BCBC <- function(X,
     U <- U_prime
 
     col_sum_sq <- colSums((X - U) ^ 2)
+    col_residuals[t, ] <- col_sum_sq
+
     lipschitz_fixed_U = sqrt(sum(col_sum_sq ^ 2))
     nu_w = 1/(1.1 * lipschitz_fixed_U)
 
@@ -198,6 +232,8 @@ BCBC <- function(X,
     }
   }
 
+  w <- w_coordinate_descent(col_sum_sq, lambda)
+
   end <- Sys.time()
 
   if (progress) {
@@ -212,7 +248,7 @@ BCBC <- function(X,
     k_features = k_features,
     k_samples = k_samples,
     phi = phi,
-    recalculate_weights = TRUE,
+    recalculate_weights = recalculate_weights,
     cobra_diffs = cobra_diffs,
     w_diffs = w_diffs,
     w_path = w_path,
@@ -220,7 +256,10 @@ BCBC <- function(X,
     rss = rss_vals,
     row_fusion = row_fusion_vals,
     col_fusion = col_fusion_vals,
-    time = as.numeric(end - start)
+    time = as.numeric(end - start, units = "secs"),
+    col_residuals = col_residuals,
+    best_obj_w = best_obj_w,
+    U_for_best_obj = U_for_best_obj
   )
 
   to_return
