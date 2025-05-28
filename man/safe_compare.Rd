@@ -2,13 +2,23 @@
 % Please edit documentation in R/utils.R
 \name{safe_compare}
 \alias{safe_compare}
-\title{Title}
+\title{Method to easily use \code{igraph::compare}}
 \usage{
 safe_compare(estimated_clusters, true_clusters, method)
 }
 \arguments{
-\item{method}{}
+\item{estimated_clusters}{community memberships}
+
+\item{true_clusters}{community memberships}
+
+\item{method}{passed to \code{igraph::compare}}
+}
+\value{
+metric in community memberships
 }
 \description{
-Title
+Method to easily use \code{igraph::compare}
+}
+\seealso{
+\code{\link[igraph:compare]{igraph::compare()}}
 }

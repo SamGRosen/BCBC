@@ -2,7 +2,7 @@
 % Please edit documentation in R/cobra.r
 \name{cobra_knn}
 \alias{cobra_knn}
-\title{Title}
+\title{Utility method to use COBRA internals and calculate weights}
 \usage{
 cobra_knn(
   X,
@@ -15,8 +15,30 @@ cobra_knn(
 )
 }
 \arguments{
-\item{tol}{}
+\item{X}{data matrix}
+
+\item{gamma}{fusion hyperparameter}
+
+\item{k_samples}{number of nearest neighbors for sample affinity graph}
+
+\item{k_features}{number of nearest neighbors for feature affinity graph}
+
+\item{phi}{bandwidth parameter}
+
+\item{max_iter}{of COBRA}
+
+\item{tol}{for termination}
+}
+\value{
+fitted bicluster matrix
 }
 \description{
-Title
+Utility method to use COBRA internals and calculate weights
+}
+\examples{
+checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 100, shuffle = FALSE)
+cobra_knn(checker$X, 200, 4, 4)
+}
+\seealso{
+\code{\link[=fast_gkn_weights]{fast_gkn_weights()}}
 }

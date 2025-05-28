@@ -2,13 +2,28 @@
 % Please edit documentation in R/nearest_neighbors.R
 \name{geometric_medoid}
 \alias{geometric_medoid}
-\title{Title}
+\title{Find geometric mediod and build star affinity graph}
 \usage{
 geometric_medoid(X, rescale = FALSE, uniform = FALSE, phi = 1)
 }
 \arguments{
-\item{phi}{}
+\item{X}{data matrix}
+
+\item{rescale}{weights and bandwidth by this factor}
+
+\item{uniform}{treat all edges as equal magnitude}
+
+\item{phi}{bandwidth for Gaussian kernel}
+}
+\value{
+list with
+\enumerate{
+\item \code{weights} vector of edge weights
+\item \code{E_row} sparse unweighted edge incidence matrix
+\item \code{fusion} sum of fusion term when using the weights and distances
+\item \code{unique_edges} data frame describing edge information
+}
 }
 \description{
-Title
+Find geometric mediod and build star affinity graph
 }

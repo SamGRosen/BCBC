@@ -2,7 +2,7 @@
 % Please edit documentation in R/missing_data.R
 \name{BCBC_missing}
 \alias{BCBC_missing}
-\title{Title}
+\title{Perform BCBC with imputation of missing values}
 \usage{
 BCBC_missing(
   X,
@@ -10,20 +10,86 @@ BCBC_missing(
   k_samples = 4,
   k_features = 4,
   gamma = 10,
-  phi = 0.05,
+  phi = 1,
   tmax_hierarchy = c(10, 25, 50),
   tol = 1e-04,
   recalculate_weights = FALSE,
   approx_neighbors = FALSE,
   hnsw_args = list(),
   progress = FALSE,
-  fusion_weights = NA,
-  return_fit = FALSE
+  fusion_wts = NA,
+  return_fits = FALSE
 )
 }
 \arguments{
-\item{progress}{}
+\item{X}{data matrix}
+
+\item{lambda}{sparsity hyperparameter}
+
+\item{k_samples}{number of nearest neighbors used to calculate sample affinity graph}
+
+\item{k_features}{number of nearest neighbors used to calculate feature affinity graph}
+
+\item{gamma}{fusion hyperparameter}
+
+\item{phi}{bandwidth of affinity graph kernel}
+
+\item{tmax_hierarchy}{vector of 3 values
+\enumerate{
+\item number of BCBC fits to run
+\item number of PALM iterations per BCBC fit
+\item number of COBRA iterations per PALM iteration
+}}
+
+\item{tol}{for early termination}
+
+\item{recalculate_weights}{if TRUE use adaptive BCBC}
+
+\item{approx_neighbors}{use approximate nearest neighbors for affinity graph}
+
+\item{hnsw_args}{passed to \code{fast_gkn_weights} for approximate NN calculation}
+
+\item{progress}{show progress}
+
+\item{fusion_wts}{use predetermined affinity graph}
+
+\item{return_fits}{return all intermediate BCBC fits}
+}
+\value{
+list with info
+\enumerate{
+\item \code{bcbc_fits} list of \code{BCBC} fits if \code{return_fits} is true
+\item \code{w} final fitted weight vector
+\item \code{w_path} fitted weight vectors from each BCBC fit
+\item \code{valid_rss} unweighted RSS of non-missing values
+\item \code{valid_weighted_rss} weighted RSS of non-missing values
+\item \code{filled_vals} imputed values from each BCBC fit
+\item \code{invalid_indices} indices of missing values
+\item \code{time} to run
+}
 }
 \description{
-Title
+Perform BCBC with imputation of missing values
+}
+\examples{
+checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 100, shuffle = FALSE)
+missing_X <- checker$X
+mask <- which(
+  matrix(
+    runif(nrow(checker$X) * ncol(checker$X)),
+    nrow = nrow(checker$X)) < 0.2,
+  arr.ind = TRUE)
+heldout_vals <- checker$X[mask]
+missing_X[mask] <- NA
+missing_fits <- BCBC_missing(missing_X,
+                             lambda = 0,
+                             gamma = 200,
+                             tmax_hierarchy = c(5, 50, 100),
+                             recalculate_weights = TRUE,
+                             return_fits = TRUE)
+image(t(missing_X))
+image(t(missing_fits$bcbc_fits[[5]]$U))
+for(i in 1:5) {
+  print(sum((missing_fits$filled_vals[i, ] - heldout_vals)^2))
+}
 }

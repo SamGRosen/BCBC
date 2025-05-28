@@ -1,23 +1,44 @@
-#' Title
+#' Perform BCBC with imputation of missing values
 #'
-#' @param X
-#' @param lambda
-#' @param k_samples
-#' @param k_features
-#' @param gamma
-#' @param phi
-#' @param tmax_inner
-#' @param tmax_outer
-#' @param tol
-#' @param recalculate_weights
-#' @param approx
-#' @param progress
+#' @inheritParams BCBC
+#' @param tmax_hierarchy vector of 3 values
+#'  1. number of BCBC fits to run
+#'  2. number of PALM iterations per BCBC fit
+#'  3. number of COBRA iterations per PALM iteration
+#' @param return_fits return all intermediate BCBC fits
 #'
-#' @return
-#' @import progress
+#' @return list with info
+#'   1. `bcbc_fits` list of `BCBC` fits if `return_fits` is true
+#'   2. `w` final fitted weight vector
+#'   3. `w_path` fitted weight vectors from each BCBC fit
+#'   4. `valid_rss` unweighted RSS of non-missing values
+#'   5. `valid_weighted_rss` weighted RSS of non-missing values
+#'   6. `filled_vals` imputed values from each BCBC fit
+#'   7. `invalid_indices` indices of missing values
+#'   8. `time` to run
 #' @export
 #'
 #' @examples
+#' checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 100, shuffle = FALSE)
+#' missing_X <- checker$X
+#' mask <- which(
+#'   matrix(
+#'     runif(nrow(checker$X) * ncol(checker$X)),
+#'     nrow = nrow(checker$X)) < 0.2,
+#'   arr.ind = TRUE)
+#' heldout_vals <- checker$X[mask]
+#' missing_X[mask] <- NA
+#' missing_fits <- BCBC_missing(missing_X,
+#'                              lambda = 0,
+#'                              gamma = 200,
+#'                              tmax_hierarchy = c(5, 50, 100),
+#'                              recalculate_weights = TRUE,
+#'                              return_fits = TRUE)
+#' image(t(missing_X))
+#' image(t(missing_fits$bcbc_fits[[5]]$U))
+#' for(i in 1:5) {
+#'   print(sum((missing_fits$filled_vals[i, ] - heldout_vals)^2))
+#' }
 BCBC_missing <- function(X,
                          lambda,
                          k_samples = 4,
@@ -34,7 +55,6 @@ BCBC_missing <- function(X,
                          return_fits = FALSE) {
   n <- nrow(X)
   p <- ncol(X)
-
   valid_indices <- which(is.finite(X), arr.ind = TRUE)
   invalid_indices <- which(!is.finite(X), arr.ind = TRUE)
 

@@ -252,20 +252,23 @@ cobra <- function(X,E_row,E_col,w_row,w_col,gamma,max_iter=1e2,tol=1e-3) {
 }
 
 
-#' Title
+#' Utility method to use COBRA internals and calculate weights
 #'
-#' @param X
-#' @param gamma
-#' @param k_samples
-#' @param k_features
-#' @param phi
-#' @param max_iter
-#' @param tol
+#' @param X data matrix
+#' @param gamma fusion hyperparameter
+#' @param k_samples number of nearest neighbors for sample affinity graph
+#' @param k_features number of nearest neighbors for feature affinity graph
+#' @param phi bandwidth parameter
+#' @param max_iter of COBRA
+#' @param tol for termination
 #'
-#' @return
+#' @return fitted bicluster matrix
+#' @seealso [fast_gkn_weights()]
 #' @export
 #'
 #' @examples
+#' checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 100, shuffle = FALSE)
+#' cobra_knn(checker$X, 200, 4, 4)
 cobra_knn <- function(X,
                       gamma,
                       k_samples = 2,

@@ -13,12 +13,29 @@ get_cv_metrics(
 )
 }
 \arguments{
+\item{X}{data matrix}
+
+\item{bcbc_run}{return value from \code{BCBC}}
+
 \item{percent_noise}{Percent of standard deviation of pairwise distances to use for thresholding}
 
 \item{num_row_clusters}{If set, tries to calculate a threshold to result in this many row clusters}
 
 \item{num_col_clusters}{If set, tries to calculate a threshold to result in this many column clusters}
 }
+\value{
+list with
+\enumerate{
+\item \code{cv_metrics} data frame with cv info such as RSS and eBIC
+\item \code{row_clusters} calculated row clusters
+\item \code{col_clusters} calculated column clusters
+}
+}
 \description{
 Get metrics to measure a single BCBC fit that are useful for cross validation
+}
+\examples{
+checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 100, shuffle = FALSE)
+bcbc_fit <- BCBC(checker$X, lambda = 0.05, gamma = 200)
+get_cv_metrics(checker$X, bcbc_fit, percent_noise = 0.25)
 }

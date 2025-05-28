@@ -2,20 +2,54 @@
 % Please edit documentation in R/clustering.R
 \name{bicluster_assignments}
 \alias{bicluster_assignments}
-\title{Title}
+\title{Calculate biclusters according to some linking criteria}
 \usage{
 bicluster_assignments(
   U,
   weights = NA,
   lambda = NA,
+  percent_noise = 0.25,
   num_row_clusters = NA,
-  num_col_clusters = NA,
-  percent_noise = 0.25
+  num_col_clusters = NA
 )
 }
 \arguments{
-\item{percent_noise}{}
+\item{U}{matrix to bicluster}
+
+\item{weights}{of feature importance}
+
+\item{lambda}{used to complete fit}
+
+\item{percent_noise}{percent of distance standard deviation used as joining radius}
+
+\item{num_row_clusters}{try to find this many row clusters if defined}
+
+\item{num_col_clusters}{try to find this many column clusters if defined}
+}
+\value{
+list with items
+\enumerate{
+\item \code{row_clusters} row membership index
+\item \code{col_clusters} column membership index
+\item \code{row_threshold} radius used to calculate row memberships
+\item \code{col_threshold} radius used to calculate column memberships
+}
 }
 \description{
-Title
+Calculate biclusters according to some linking criteria
+}
+\examples{
+checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 100, shuffle = TRUE)
+bcbc_fit <- BCBC(checker$X, lambda = 0.05, gamma = 200)
+assignments <- bicluster_assignments(
+  bcbc_fit$U,
+  weights = bcbc_fit$w,
+  lambda = bcbc_fit$lambda,
+  percent_noise = 0.1
+)
+as_df <- bcbc_result_to_df(bcbc_fit, labels = assignments$row_clusters)
+plot_fit(as_df)
+}
+\seealso{
+\code{\link[=unweighted_bicluster_assignments]{unweighted_bicluster_assignments()}}
 }

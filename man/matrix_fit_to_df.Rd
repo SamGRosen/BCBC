@@ -2,7 +2,7 @@
 % Please edit documentation in R/utils.R
 \name{matrix_fit_to_df}
 \alias{matrix_fit_to_df}
-\title{Title}
+\title{Convert a matrix into a dataframe for post-processing or plotting.}
 \usage{
 matrix_fit_to_df(
   matrix,
@@ -11,12 +11,45 @@ matrix_fit_to_df(
   weights = c(),
   lambda = 0,
   filter_weight = 0,
-  cluster_with_weights = TRUE
+  cluster_with_weights = TRUE,
+  method = "ward.D"
 )
 }
 \arguments{
-\item{cluster_with_weights}{}
+\item{matrix}{to convert}
+
+\item{labels}{to match to each row}
+
+\item{labels2}{secondary set to match to each row}
+
+\item{weights}{to measure importance of features}
+
+\item{lambda}{hyperparameter used to create fit}
+
+\item{filter_weight}{remove features with weight less than or equal to this}
+
+\item{cluster_with_weights}{perform clustering with feature weights}
+
+\item{method}{passed to \code{hclust} to determine row and column partitioning}
+}
+\value{
+data frame with column names
+\enumerate{
+\item \code{row_num} original row number of matrix entry
+\item \code{col_num} original column number of matrix entry
+\item \code{value} original value of matrix entry
+\item \code{order_row} a permutated row number for plotting similar rows together
+\item \code{order_col} a permutated column number for plotting similar columns together
+\item \code{weight} weight of original column if \code{weights} parameter provided
+\item \code{label} label of original row if \code{labels} parameter provided
+\item \code{label2} label of original row if \code{labels2} parameter provided
+}
 }
 \description{
-Title
+Convert a matrix into a dataframe for post-processing or plotting.
+}
+\examples{
+checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 100, shuffle = TRUE)
+ggplot(matrix_fit_to_df(checker$X), aes(x = order_col, y = order_row)) +
+  geom_raster(aes(fill = value))
 }

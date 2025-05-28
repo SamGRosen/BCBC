@@ -2,15 +2,18 @@
 % Please edit documentation in R/bcbc.R
 \name{w_coordinate_descent}
 \alias{w_coordinate_descent}
-\title{Title}
+\title{Perform block coordinate optimization on weights after finding fitted matrix}
 \usage{
 w_coordinate_descent(col_sum_sq, lambda)
 }
 \arguments{
 \item{col_sum_sq}{Sum of squared errors for columns}
 
-\item{lambda}{}
+\item{lambda}{hyperparameter in biconvex objective for sparsity}
+}
+\value{
+argmin_{w in simplex} sum (w_i^2 + lambda * w_i) col_sum_sq_i
 }
 \description{
-Title
+Perform block coordinate optimization on weights after finding fitted matrix
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/clustering.R
 \name{unweighted_bicluster_assignments}
 \alias{unweighted_bicluster_assignments}
-\title{Title}
+\title{Calculate biclusters according to some linking criteria without feature weights}
 \usage{
 unweighted_bicluster_assignments(
   U,
@@ -12,8 +12,36 @@ unweighted_bicluster_assignments(
 )
 }
 \arguments{
-\item{percent_noise}{}
+\item{U}{matrix to bicluster}
+
+\item{num_row_clusters}{try to find this many row clusters if defined}
+
+\item{num_col_clusters}{try to find this many column clusters if defined}
+
+\item{percent_noise}{percent of distance standard deviation used as joining radius}
+}
+\value{
+list with items
+\enumerate{
+\item \code{row_clusters} row membership index
+\item \code{col_clusters} column membership index
+\item \code{row_threshold} radius used to calculate row memberships
+\item \code{col_threshold} radius used to calculate column memberships
+}
 }
 \description{
-Title
+Calculate biclusters according to some linking criteria without feature weights
+}
+\examples{
+checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 100, shuffle = TRUE)
+bcbc_fit <- BCBC(checker$X, lambda = 0.05, gamma = 200)
+assignments <- unweighted_bicluster_assignments(
+  bcbc_fit$U,
+  percent_noise = 0.1
+)
+as_df <- bcbc_result_to_df(bcbc_fit, labels = assignments$row_clusters)
+plot_fit(as_df)
+}
+\seealso{
+\code{\link[=bicluster_assignments]{bicluster_assignments()}}
 }

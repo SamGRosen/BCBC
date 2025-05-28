@@ -2,13 +2,27 @@
 % Please edit documentation in R/utils.R
 \name{plot_w_path}
 \alias{plot_w_path}
-\title{Title}
+\title{Debug BCBC fits by examining the weights during optimization iteration}
 \usage{
-plot_w_path(w_path, reorder = TRUE)
+plot_w_path(w_path, reorder = TRUE, extra_data = w_path)
 }
 \arguments{
-\item{reorder}{}
+\item{w_path}{from \verb{$w_path} of a \code{BCBC} fit value}
+
+\item{reorder}{the columns based on weight values}
+
+\item{extra_data}{matrix with equal dimensions as weight path from BCBC fit
+to plot instead}
+}
+\value{
+ggplot_object
 }
 \description{
-Title
+Debug BCBC fits by examining the weights during optimization iteration
+}
+\examples{
+checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 100, shuffle = TRUE)
+bcbc_fit <- BCBC(checker$X, lambda = 0.05, gamma = 200)
+plot_w_path(bcbc_fit$w_path)
+plot_w_path(bcbc_fit$w_path, extra_data=bcbc_fit$col_residuals)
 }

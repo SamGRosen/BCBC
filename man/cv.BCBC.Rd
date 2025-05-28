@@ -2,7 +2,7 @@
 % Please edit documentation in R/cv.R
 \name{cv.BCBC}
 \alias{cv.BCBC}
-\title{Title}
+\title{Perform many runs of \code{BCBC} for cross-validation purposes.}
 \usage{
 cv.BCBC(
   X,
@@ -25,8 +25,74 @@ cv.BCBC(
 )
 }
 \arguments{
+\item{X}{data matrix}
+
+\item{lambdas}{inputs to \code{BCBC}}
+
+\item{k_samples}{inputs to \code{BCBC}}
+
+\item{k_features}{inputs to \code{BCBC}}
+
+\item{gammas}{inputs to \code{BCBC}}
+
+\item{tmaxs}{inputs to \code{BCBC}}
+
+\item{tmax_outers}{inputs to \code{BCBC}}
+
+\item{tmax_cobras}{inputs to \code{BCBC}}
+
+\item{phis}{inputs to \code{BCBC}}
+
+\item{recalculate_weights}{inputs to \code{BCBC}}
+
+\item{tols}{inputs to \code{BCBC}}
+
+\item{percent_noise}{input to \code{get_cv_metrics}}
+
 \item{...}{passed to BCBC}
+
+\item{progress}{show progress}
+}
+\value{
+list with
+\enumerate{
+\item \code{all_runs} used for calculation
+\item \code{cv_data} all metrics used for cv
+\item \code{row_clusters} all row clusters
+\item \code{col_clusters} all column clusters
+\item \code{all_params} hyperparameter grid
+}
 }
 \description{
-Title
+Perform many runs of \code{BCBC} for cross-validation purposes.
+}
+\examples{
+checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 100, shuffle = TRUE)
+bcbc_fit_info <- cv.BCBC(
+  checker$X,
+  lambdas = seq(0, 0.2, 0.05),
+  percent_noise = seq(0.05, 0.25, 0.05),
+  gammas = 100
+)
+
+best_run_info <- bcbc_fit_info$cv_data |>
+  filter(is.finite(eBIC2)) |>
+  slice(which.min(eBIC2))
+best_param_index <- best_run_info$param_index
+best_cluster_index <- best_run_info$index
+row_groups <- bcbc_fit_info$row_clusters[[best_cluster_index]]
+col_groups <- bcbc_fit_info$col_clusters[[best_cluster_index]]
+best_run <- bcbc_fit_info$all_runs[[best_param_index]]
+
+fit_as_df <- bcbc_result_to_df(best_run, labels = row_groups, filter_weight = 0)
+plot_fit(fit_as_df, bin_scale = 10)
+}
+\seealso{
+\code{\link[=BCBC]{BCBC()}}
+
+\code{\link[=cv.BCBC_holdout]{cv.BCBC_holdout()}}
+
+\code{\link[=get_cv_metrics]{get_cv_metrics()}}
+
+\code{\link[=get_all_cv_metrics]{get_all_cv_metrics()}}
 }

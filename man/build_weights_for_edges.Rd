@@ -2,7 +2,7 @@
 % Please edit documentation in R/nearest_neighbors.R
 \name{build_weights_for_edges}
 \alias{build_weights_for_edges}
-\title{Title}
+\title{Build list for usage with \code{cobra}.}
 \usage{
 build_weights_for_edges(
   edges,
@@ -13,8 +13,25 @@ build_weights_for_edges(
 )
 }
 \arguments{
-\item{phi}{}
+\item{edges}{data frame describing}
+
+\item{distances}{corresponding to each edge}
+
+\item{uniform}{treat all edges as equal magnitude}
+
+\item{rescale}{weights and bandwidth by this factor}
+
+\item{phi}{bandwidth for Gaussian kernel}
+}
+\value{
+list with
+\enumerate{
+\item \code{weights} vector of edge weights
+\item \code{E_row} sparse unweighted edge incidence matrix
+\item \code{fusion} sum of fusion term when using the weights and distances
+\item \code{unique_edges} data frame describing edge information
+}
 }
 \description{
-Title
+Build list for usage with \code{cobra}.
 }

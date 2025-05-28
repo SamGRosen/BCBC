@@ -2,19 +2,55 @@
 % Please edit documentation in R/utils.R
 \name{bcbc_result_to_df}
 \alias{bcbc_result_to_df}
-\title{Title}
+\title{Convert a BCBC result from \code{BCBC}.}
 \usage{
 bcbc_result_to_df(
   bcbc_result,
   cluster_with_weights = TRUE,
   filter_weight = -Inf,
   labels = NULL,
-  labels2 = NULL
+  labels2 = NULL,
+  method = "ward.D"
 )
 }
 \arguments{
-\item{labels2}{}
+\item{bcbc_result}{from \code{BCBC}}
+
+\item{cluster_with_weights}{perform clustering with feature weights}
+
+\item{filter_weight}{remove features with weight less than or equal to this}
+
+\item{labels}{to match to each row}
+
+\item{labels2}{secondary set to match to each row}
+
+\item{method}{passed to \code{hclust} to determine row and column partitioning}
+}
+\value{
+data frame with column names
+\enumerate{
+\item \code{row_num} original row number of matrix entry
+\item \code{col_num} original column number of matrix entry
+\item \code{value} original value of matrix entry
+\item \code{order_row} a permutated row number for plotting similar rows together
+\item \code{order_col} a permutated column number for plotting similar columns together
+\item \code{weight} weight of original column if \code{weights} parameter provided
+\item \code{label} label of original row if \code{labels} parameter provided
+\item \code{label2} label of original row if \code{labels2} parameter provided
+}
 }
 \description{
-Title
+Convert a BCBC result from \code{BCBC}.
+}
+\examples{
+checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 100, shuffle = TRUE)
+bcbc_fit <- BCBC(checker$X, lambda = 0.01, gamma = 100)
+as_df <- bcbc_result_to_df(bcbc_fit)
+ggplot(as_df, aes(x = order_col, y = order_row)) +
+  geom_raster(aes(fill = value, alpha = weight))
+}
+\seealso{
+\code{\link[=matrix_fit_to_df]{matrix_fit_to_df()}}
+
+\code{\link[=BCBC]{BCBC()}}
 }

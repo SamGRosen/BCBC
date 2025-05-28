@@ -2,13 +2,25 @@
 % Please edit documentation in R/clustering.R
 \name{get_row_clusters}
 \alias{get_row_clusters}
-\title{Title}
+\title{Get row clusters memberships with thresholding radius.}
 \usage{
 get_row_clusters(mat, threshold)
 }
 \arguments{
-\item{threshold}{}
+\item{mat}{to find row memberships for}
+
+\item{threshold}{radius to join rows into communities}
+}
+\value{
+vector of row memberships
 }
 \description{
-Title
+Get row clusters memberships with thresholding radius.
+}
+\examples{
+checker <- gen_checkerboard(100, 150, 100, 5, shuffle = TRUE)
+get_row_clusters(checker$X, 10*sd(checker$X)^2)
+}
+\seealso{
+\code{\link[dbscan:frNN]{dbscan::frNN()}}
 }

@@ -2,13 +2,36 @@
 % Please edit documentation in R/bcbc.R
 \name{calc_fusion_term}
 \alias{calc_fusion_term}
-\title{Title}
+\title{Calculate the fusion term in the BCBC objective function}
 \usage{
-calc_fusion_term(edges, weights, U, rows = TRUE)
+calc_fusion_term(edges, affinities, U, rows = TRUE)
 }
 \arguments{
-\item{rows}{}
+\item{edges}{output of affinity calculating function}
+
+\item{affinities}{output of affinity calculating function}
+
+\item{U}{input to fusion function}
+
+\item{rows}{logical value indicating to calculate over rows}
+}
+\value{
+fusion value
 }
 \description{
-Title
+Calculate the fusion term in the BCBC objective function
+}
+\examples{
+checker <- gen_checkerboard(n = 100,
+                            p = 100,
+                            num_row_clusters = 5,
+                            num_col_clusters = 5,
+                            p_extra = 25,
+                            shuffle = FALSE)
+fusion_wts <- fast_gkn_weights(t(checker$X), k_row = 4, k_col = 4, phi = 1)
+calc_fusion_term(fusion_wts$unique_row_edges, fusion_wts$w_row, checker$X, rows=FALSE)
+calc_fusion_term(fusion_wts$unique_col_edges, fusion_wts$w_col, checker$X, rows=TRUE)
+}
+\seealso{
+\code{\link[=fast_gkn_edges]{fast_gkn_edges()}} for Gaussian k-nearest neighbor affinities
 }

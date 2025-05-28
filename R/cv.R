@@ -1,15 +1,21 @@
 #' Get metrics to measure a single BCBC fit that are useful for cross validation
 #'
-#' @param X
-#' @param bcbc_run
+#' @param X data matrix
+#' @param bcbc_run return value from `BCBC`
 #' @param percent_noise Percent of standard deviation of pairwise distances to use for thresholding
 #' @param num_row_clusters If set, tries to calculate a threshold to result in this many row clusters
 #' @param num_col_clusters If set, tries to calculate a threshold to result in this many column clusters
 #'
-#' @return
+#' @return list with
+#'   1. `cv_metrics` data frame with cv info such as RSS and eBIC
+#'   2. `row_clusters` calculated row clusters
+#'   3. `col_clusters` calculated column clusters
 #' @export
 #'
 #' @examples
+#' checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 100, shuffle = FALSE)
+#' bcbc_fit <- BCBC(checker$X, lambda = 0.05, gamma = 200)
+#' get_cv_metrics(checker$X, bcbc_fit, percent_noise = 0.25)
 get_cv_metrics <- function(X,
                            bcbc_run,
                            percent_noise = 0.25,
@@ -59,19 +65,22 @@ get_cv_metrics <- function(X,
 }
 
 
-#' Title
+#' Utility method to get cv metrics for many BCBC fits. Use `cv.BCBC` instead.
 #'
-#' @param X
-#' @param bcbc_runs
-#' @param all_params
-#' @param percent_noise
-#' @param num_row_clusters
-#' @param num_col_clusters
+#' @param X data matrix
+#' @param bcbc_runs list of bcbc runs to use
+#' @param all_params grid of hyperparameters
+#' @param percent_noise vector of potential percent_noises to build biclusters
+#' @inheritParams get_cv_metrics
+#' @seealso [cv.BCBC()]
 #'
-#' @return
+#' @return list with
+#'   1. `all_runs` used for calculation
+#'   1. `cv_data` all metrics used for cv
+#'   1. `row_clusters` all row clusters
+#'   1. `col_clusters` all column clusters
+#'   1. `all_params` hyperparameter grid
 #' @export
-#'
-#' @examples
 get_all_cv_metrics <- function(X,
                                bcbc_runs,
                                all_params = data.frame(),
@@ -116,27 +125,50 @@ get_all_cv_metrics <- function(X,
   )
 }
 
-#' Title
+#' Perform many runs of `BCBC` for cross-validation purposes.
 #'
-#' @param X
-#' @param lambdas
-#' @param k_samples
-#' @param k_features
-#' @param gammas
-#' @param tmaxs
-#' @param tmax_outers
-#' @param tmax_cobras
-#' @param phis
-#' @param recalculate_weights
-#' @param tols
-#' @param percent_noise
-#' @param progress
+#' @param X data matrix
+#' @param lambdas inputs to `BCBC`
+#' @param k_samples inputs to `BCBC`
+#' @param k_features inputs to `BCBC`
+#' @param gammas inputs to `BCBC`
+#' @param tmaxs inputs to `BCBC`
+#' @param tmax_outers inputs to `BCBC`
+#' @param tmax_cobras inputs to `BCBC`
+#' @param phis inputs to `BCBC`
+#' @param recalculate_weights inputs to `BCBC`
+#' @param tols inputs to `BCBC`
+#' @param percent_noise input to `get_cv_metrics`
+#' @param progress show progress
 #' @param ... passed to BCBC
 #'
-#' @return
+#' @inherit get_all_cv_metrics return
+#' @seealso [BCBC()]
+#' @seealso [cv.BCBC_holdout()]
+#' @seealso [get_cv_metrics()]
+#' @seealso [get_all_cv_metrics()]
 #' @export
 #'
 #' @examples
+#' checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 100, shuffle = TRUE)
+#' bcbc_fit_info <- cv.BCBC(
+#'   checker$X,
+#'   lambdas = seq(0, 0.2, 0.05),
+#'   percent_noise = seq(0.05, 0.25, 0.05),
+#'   gammas = 100
+#' )
+#'
+#' best_run_info <- bcbc_fit_info$cv_data |>
+#'   filter(is.finite(eBIC2)) |>
+#'   slice(which.min(eBIC2))
+#' best_param_index <- best_run_info$param_index
+#' best_cluster_index <- best_run_info$index
+#' row_groups <- bcbc_fit_info$row_clusters[[best_cluster_index]]
+#' col_groups <- bcbc_fit_info$col_clusters[[best_cluster_index]]
+#' best_run <- bcbc_fit_info$all_runs[[best_param_index]]
+#'
+#' fit_as_df <- bcbc_result_to_df(best_run, labels = row_groups, filter_weight = 0)
+#' plot_fit(fit_as_df, bin_scale = 10)
 cv.BCBC <- function(X,
                     lambdas = c(1),
                     k_samples = c(2),

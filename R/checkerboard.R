@@ -12,10 +12,22 @@
 #' @param cluster_spread range of possible cluster spread
 #' @param equally_spaced try to make the cluster centers have equal pairwise distances
 #'
-#' @return
+#' @return list with info
+#'   1. `num_row_clusters`, `num_col_clusters`, `p_extra`, `prob_empty`,
+#'    `noise`, `cluster_spread`, `equally_spaced` input parameters
+#'   1. `X` data matrix
+#'   1. `centers` true centers for `X`
+#'   1. `row_partition` row community assignments
+#'   1. `col_partition` column community assignments
+#'   1. `true_features` binary vector indicating true features
+#'   1. `disjoint_biclusters` bicluster labels ignoring feature importance
+#'   1. `biclusters` bicluster labels setting all unimportant features to same bicluster
 #' @export
 #'
 #' @examples
+#' checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 100, shuffle = FALSE)
+#' as_df <- matrix_fit_to_df(checker$X, labels = checker$row_partition)
+#' plot_fit(as_df)
 gen_checkerboard <- function(n,
                              p,
                              num_row_clusters,

@@ -2,7 +2,8 @@
 % Please edit documentation in R/holdout_cv.R
 \name{cv.BCBC_holdout}
 \alias{cv.BCBC_holdout}
-\title{Title}
+\title{Perform cross-validation with a hold-out test set. Used to find optimal gamma
+hyperparameter.}
 \usage{
 cv.BCBC_holdout(
   X,
@@ -17,12 +18,68 @@ cv.BCBC_holdout(
   hnsw_args = list(),
   tols = c(0.001),
   tmax_hierarchy = c(10, 25, 50),
+  return_fits = FALSE,
   ...
 )
 }
 \arguments{
-\item{...}{}
+\item{X}{data matrix}
+
+\item{holdout_size}{percent of data to leave out}
+
+\item{lambdas}{passed to \code{BCBC_missing}}
+
+\item{gammas}{passed to \code{BCBC_missing}}
+
+\item{k_samples}{passed to \code{BCBC_missing}}
+
+\item{k_features}{passed to \code{BCBC_missing}}
+
+\item{phis}{passed to \code{BCBC_missing}}
+
+\item{recalculate_weights}{passed to \code{BCBC_missing}}
+
+\item{approx_neighbors}{passed to \code{BCBC_missing}}
+
+\item{hnsw_args}{passed to \code{BCBC_missing}}
+
+\item{tols}{passed to \code{BCBC_missing}}
+
+\item{tmax_hierarchy}{passed to \code{BCBC_missing}}
+
+\item{return_fits}{passed to \code{BCBC_missing}}
+
+\item{...}{passed to \code{BCBC_missing}}
+}
+\value{
+list with info
+\enumerate{
+\item \code{all_runs} all returned runs from \code{BCBC_missing}
+\item \code{gamma_cv_data} data frame of hyperparameters and cv metrics
+\item \code{all_params} grid of hyperparameters used for fitting
+\item \code{mask} of hold-out data
+\item \code{holdout_size}, \code{tmax_hierarchy} input parameters
+}
 }
 \description{
-Title
+Perform cross-validation with a hold-out test set. Used to find optimal gamma
+hyperparameter.
+}
+\examples{
+checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 100, shuffle = FALSE)
+gamma_cv <- cv.BCBC_holdout(
+  checker$X,
+  holdout_size = 0.2,
+  lambdas = c(0),
+  gammas = seq(50, 300, 50),
+  k_samples = 4,
+  k_features = 4,
+  recalculate_weights = T
+)
+View(gamma_cv$gamma_cv_data)
+}
+\seealso{
+\code{\link[=BCBC_missing]{BCBC_missing()}}
+
+\code{\link[=cv.BCBC]{cv.BCBC()}}
 }

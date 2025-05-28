@@ -2,13 +2,36 @@
 % Please edit documentation in R/clustering.R
 \name{bicluster_centers}
 \alias{bicluster_centers}
-\title{Title}
+\title{Calculate least square estimate for bicluster centers given assignments}
 \usage{
 bicluster_centers(X, row_clusters, col_clusters)
 }
 \arguments{
-\item{col_clusters}{}
+\item{X}{data matrix to find centers for}
+
+\item{row_clusters}{cluster membership of rows}
+
+\item{col_clusters}{cluster membership of columns}
+}
+\value{
+list with entries \code{fit} for fitted centers and \code{assignments} for bicluster labels
 }
 \description{
-Title
+Calculate least square estimate for bicluster centers given assignments
+}
+\examples{
+checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 100, shuffle = FALSE)
+bcbc_fit <- BCBC(checker$X, lambda = 0.05, gamma = 200)
+assignments <- bicluster_assignments(
+  bcbc_fit$U,
+  weights = bcbc_fit$w,
+  lambda = bcbc_fit$lambda,
+  percent_noise = 0.1
+)
+centers <- bicluster_centers(
+  checker$X,
+  assignments$row_clusters,
+  assignments$col_clusters
+)
+plot_fit(matrix_fit_to_df(centers$fit))
 }

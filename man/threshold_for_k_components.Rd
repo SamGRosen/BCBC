@@ -12,8 +12,21 @@ threshold_for_k_components(
 )
 }
 \arguments{
-\item{maxiter}{}
+\item{dist_mat}{distance matrix of data points}
+
+\item{k}{number of connected components}
+
+\item{max_threshold}{highest radius to use}
+
+\item{maxiter}{number of iters used to find radius}
+}
+\value{
+radius for k connected components
 }
 \description{
 Get radius to create k connected components in a nearest neighbor graph
+}
+\examples{
+checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 0, shuffle = TRUE)
+threshold_for_k_components(dist(checker$X), 20)
 }

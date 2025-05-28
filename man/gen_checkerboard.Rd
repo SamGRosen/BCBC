@@ -14,7 +14,8 @@ gen_checkerboard(
   cluster_spread = 5,
   prob_empty = 0.1,
   shuffle = TRUE,
-  scale = TRUE
+  scale = TRUE,
+  equally_spaced = FALSE
 )
 }
 \arguments{
@@ -30,12 +31,35 @@ gen_checkerboard(
 
 \item{noise}{standard deviation of normal noise added to checkerboard}
 
+\item{cluster_spread}{range of possible cluster spread}
+
 \item{prob_empty}{between 0 and 1, probability a bicluster is 0}
 
 \item{shuffle}{randomly reorder rows and columns}
 
 \item{scale}{the resulting matrix}
+
+\item{equally_spaced}{try to make the cluster centers have equal pairwise distances}
+}
+\value{
+list with info
+\enumerate{
+\item \code{num_row_clusters}, \code{num_col_clusters}, \code{p_extra}, \code{prob_empty},
+\code{noise}, \code{cluster_spread}, \code{equally_spaced} input parameters
+\item \code{X} data matrix
+\item \code{centers} true centers for \code{X}
+\item \code{row_partition} row community assignments
+\item \code{col_partition} column community assignments
+\item \code{true_features} binary vector indicating true features
+\item \code{disjoint_biclusters} bicluster labels ignoring feature importance
+\item \code{biclusters} bicluster labels setting all unimportant features to same bicluster
+}
 }
 \description{
 Generate simulated data resembling a checkerboard
+}
+\examples{
+checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 100, shuffle = FALSE)
+as_df <- matrix_fit_to_df(checker$X, labels = checker$row_partition)
+plot_fit(as_df)
 }

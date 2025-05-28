@@ -1,39 +1,51 @@
 #' Orthogonal projection of a vector onto the simplex
 #'
 #' From https://github.com/kharchenkolab/vrnmf/tree/main
-#' @param unproj
-#' @param bound
+#' @param unproj input vector
+#' @param bound sum of projected vector
 #'
-#' @return
+#' @return orthogonal projection of `unproj`
 #' @export
 #'
 #' @examples
-projection_onto_simplex <- function(unproj, bound=1) {
+#' projection_onto_simplex(c(0.3, 0.3, 0.2))
+#'
+projection_onto_simplex <- function(unproj, bound = 1) {
   q <- sort(unproj, decreasing = TRUE, method = "quick")
   qcum <- cumsum(q)
   mu <- (qcum - bound) / 1:length(qcum)
   cond1 <- (mu[-length(mu)] - q[-1]) > 0
   if (max(cond1) == 0) {
     ind <- length(mu)
-  } else{
+  } else {
     ind <- which.max(cond1)
   }
   return(pmax(0, unproj - mu[ind]))
 }
 
 
-#' Title
+#' Calculate the fusion term in the BCBC objective function
 #'
-#' @param edges
-#' @param weights
-#' @param U
-#' @param rows
+#' @param edges output of affinity calculating function
+#' @param affinities output of affinity calculating function
+#' @param U input to fusion function
+#' @param rows logical value indicating to calculate over rows
 #'
-#' @return
+#' @seealso [fast_gkn_edges()] for Gaussian k-nearest neighbor affinities
+#' @return fusion value
 #' @export
 #'
 #' @examples
-calc_fusion_term <- function(edges, weights, U, rows=TRUE) {
+#' checker <- gen_checkerboard(n = 100,
+#'                             p = 100,
+#'                             num_row_clusters = 5,
+#'                             num_col_clusters = 5,
+#'                             p_extra = 25,
+#'                             shuffle = FALSE)
+#' fusion_wts <- fast_gkn_weights(t(checker$X), k_row = 4, k_col = 4, phi = 1)
+#' calc_fusion_term(fusion_wts$unique_row_edges, fusion_wts$w_row, checker$X, rows=FALSE)
+#' calc_fusion_term(fusion_wts$unique_col_edges, fusion_wts$w_col, checker$X, rows=TRUE)
+calc_fusion_term <- function(edges, affinities, U, rows=TRUE) {
   from_node <- edges$from_node
   to_node <- edges$to_node
 
@@ -45,19 +57,17 @@ calc_fusion_term <- function(edges, weights, U, rows=TRUE) {
       all_distances[i] = sqrt(sum((U[, from_node[i]] - U[, to_node[i]])^2))
     }
   }
-  return(sum(weights * all_distances))
+  return(sum(affinities * all_distances))
 }
 
 
-#' Title
+#' Perform block coordinate optimization on weights after finding fitted matrix
 #'
 #' @param col_sum_sq Sum of squared errors for columns
-#' @param lambda
+#' @param lambda hyperparameter in biconvex objective for sparsity
 #'
-#' @return
+#' @return argmin_{w in simplex} sum (w_i^2 + lambda * w_i) col_sum_sq_i
 #' @export
-#'
-#' @examples
 w_coordinate_descent <- function(col_sum_sq, lambda) {
   f = function(alpha) {
     s = sum(pmax(alpha / col_sum_sq - lambda, 0))
@@ -69,29 +79,59 @@ w_coordinate_descent <- function(col_sum_sq, lambda) {
 }
 
 
-#' Title
+#' Perform Biconvex Biclustering
 #'
-#' @param X
-#' @param lambda
-#' @param k_features
-#' @param k_samples
-#' @param gamma
-#' @param phi
-#' @param tmax
-#' @param tmax_cobra
-#' @param tmax_outer
-#' @param tol
-#' @param recalculate_weights
-#' @param greedy_terminate
-#' @param approx_neighbors
-#' @param hnsw_args
-#' @param progress
-#' @param fusion_wts
+#' @param X data matrix
+#' @param lambda sparsity hyperparameter
+#' @param k_features number of nearest neighbors used to calculate feature affinity graph
+#' @param k_samples number of nearest neighbors used to calculate sample affinity graph
+#' @param gamma fusion hyperparameter
+#' @param phi bandwidth of affinity graph kernel
+#' @param tmax number of max iterations for COBRA and PALM
+#' @param tmax_cobra number of max iterations for COBRA
+#' @param tmax_outer number of max iterations for PALM
+#' @param tol for early termination
+#' @param recalculate_weights if TRUE use adaptive BCBC
+#' @param greedy_terminate terminate if objective function does not decrease after iteration
+#' @param approx_neighbors use approximate nearest neighbors for affinity graph
+#' @param hnsw_args passed to `fast_gkn_weights` for approximate NN calculation
+#' @param progress show progress
+#' @param fusion_wts use predetermined affinity graph
+#' @param init_U use this matrix for initial PALM iterations
 #'
-#' @return
+#' @return list for BCBC fit including
+#'   1. `U` fitted matrix
+#'   1. `w` fitted weights
+#'   1. `lambda`, `gamma`, `k_features`, `k_samples`, `phi`, `recalculate_weights`  input parameters
+#'   1. `cobra_diffs` difference in `U` iterates
+#'   1. `w_diffs` difference in `w` iterates
+#'   1. `w_path` all `w` iterates
+#'   1. `objective` value of objective function for all iterates
+#'   1. `rss` weighted rss value for all iterates
+#'   1. `row_fusion` row fusion penalties for all iterates
+#'   1. `col_fusion` col fusion penalties for all iterates
+#'   1. `time` to termination
+#'   1. `col_residuals` unweighted residuals per column for all iterates
+#'   1. `best_obj_w` best w at lowest objective found during iteration
+#'   1. `best_obj_U` best U at lowest objective found during iteration
+#' @import progress
 #' @export
 #'
 #' @examples
+#' checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 100, shuffle = FALSE)
+#' bcbc_fit <- BCBC(checker$X, lambda = 0.05, gamma = 200)
+#' assignments <- bicluster_assignments(
+#'   bcbc_fit$U,
+#'   weights = bcbc_fit$w,
+#'   lambda = bcbc_fit$lambda,
+#'   percent_noise = 0.1
+#' )
+#' centers <- bicluster_centers(
+#'   checker$X,
+#'   assignments$row_clusters,
+#'   assignments$col_clusters
+#' )
+#' plot_fit(matrix_fit_to_df(centers$fit))
 BCBC <- function(X,
                  lambda,
                  k_features = 4,
@@ -109,6 +149,10 @@ BCBC <- function(X,
                  progress = TRUE,
                  fusion_wts = NA,
                  init_U = X) {
+
+  stopifnot("gamma must be > 0" = gamma > 0)
+  stopifnot("lambda must be >= 0" = lambda >= 0)
+
   n <- dim(X)[1]
   p <- dim(X)[2]
   U <- init_U

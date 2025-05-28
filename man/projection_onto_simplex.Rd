@@ -7,8 +7,17 @@
 projection_onto_simplex(unproj, bound = 1)
 }
 \arguments{
-\item{bound}{}
+\item{unproj}{input vector}
+
+\item{bound}{sum of projected vector}
+}
+\value{
+orthogonal projection of \code{unproj}
 }
 \description{
 From https://github.com/kharchenkolab/vrnmf/tree/main
+}
+\examples{
+projection_onto_simplex(c(0.3, 0.3, 0.2))
+
 }

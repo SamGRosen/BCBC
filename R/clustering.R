@@ -1,13 +1,16 @@
-#' Title
+#' Get row clusters memberships with thresholding radius.
 #'
-#' @param mat
-#' @param threshold
+#' @param mat to find row memberships for
+#' @param threshold radius to join rows into communities
 #'
-#' @return
+#' @return vector of row memberships
 #' @import dbscan
 #' @export
+#' @seealso [dbscan::frNN()]
 #'
 #' @examples
+#' checker <- gen_checkerboard(100, 150, 100, 5, shuffle = TRUE)
+#' get_row_clusters(checker$X, 10*sd(checker$X)^2)
 get_row_clusters <- function(mat, threshold) {
   if (is.null(threshold) ||
       is.na(threshold) || threshold < 0) {
@@ -23,16 +26,18 @@ get_row_clusters <- function(mat, threshold) {
 
 #' Get radius to create k connected components in a nearest neighbor graph
 #'
-#' @param dist_mat
-#' @param k
-#' @param max_threshold
-#' @param maxiter
+#' @param dist_mat distance matrix of data points
+#' @param k number of connected components
+#' @param max_threshold highest radius to use
+#' @param maxiter number of iters used to find radius
 #'
-#' @return
+#' @return radius for k connected components
 #' @import dbscan
 #' @export
 #'
 #' @examples
+#' checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 0, shuffle = TRUE)
+#' threshold_for_k_components(dist(checker$X), 20)
 threshold_for_k_components <- function(dist_mat,
                                        k,
                                        max_threshold = max(dist_mat),
@@ -55,25 +60,40 @@ threshold_for_k_components <- function(dist_mat,
   root$root
 }
 
-#' Title
+#' Calculate biclusters according to some linking criteria
 #'
-#' @param U
-#' @param weights
-#' @param lambda
-#' @param num_row_clusters
-#' @param num_col_clusters
-#' @param percent_noise
+#' @param U matrix to bicluster
+#' @param weights of feature importance
+#' @param lambda used to complete fit
+#' @param percent_noise percent of distance standard deviation used as joining radius
+#' @param num_row_clusters try to find this many row clusters if defined
+#' @param num_col_clusters try to find this many column clusters if defined
 #'
-#' @return
+#' @return list with items
+#'   1. `row_clusters` row membership index
+#'   1. `col_clusters` column membership index
+#'   1. `row_threshold` radius used to calculate row memberships
+#'   1. `col_threshold` radius used to calculate column memberships
+#' @seealso [unweighted_bicluster_assignments()]
 #' @export
 #'
 #' @examples
+#' checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 100, shuffle = TRUE)
+#' bcbc_fit <- BCBC(checker$X, lambda = 0.05, gamma = 200)
+#' assignments <- bicluster_assignments(
+#'   bcbc_fit$U,
+#'   weights = bcbc_fit$w,
+#'   lambda = bcbc_fit$lambda,
+#'   percent_noise = 0.1
+#' )
+#' as_df <- bcbc_result_to_df(bcbc_fit, labels = assignments$row_clusters)
+#' plot_fit(as_df)
 bicluster_assignments <- function(U,
                                   weights=NA,
                                   lambda=NA,
+                                  percent_noise=0.25,
                                   num_row_clusters=NA,
-                                  num_col_clusters=NA,
-                                  percent_noise=0.25) {
+                                  num_col_clusters=NA) {
   n = nrow(U)
   p = ncol(U)
 
@@ -126,17 +146,22 @@ bicluster_assignments <- function(U,
   )
 }
 
-#' Title
+#' Calculate biclusters according to some linking criteria without feature weights
 #'
-#' @param U
-#' @param num_row_clusters
-#' @param num_col_clusters
-#' @param percent_noise
-#'
-#' @return
+#' @inheritParams bicluster_assignments
+#' @inherit bicluster_assignments return
+#' @seealso [bicluster_assignments()]
 #' @export
 #'
 #' @examples
+#' checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 100, shuffle = TRUE)
+#' bcbc_fit <- BCBC(checker$X, lambda = 0.05, gamma = 200)
+#' assignments <- unweighted_bicluster_assignments(
+#'   bcbc_fit$U,
+#'   percent_noise = 0.1
+#' )
+#' as_df <- bcbc_result_to_df(bcbc_fit, labels = assignments$row_clusters)
+#' plot_fit(as_df)
 unweighted_bicluster_assignments <- function(U,
                                              num_row_clusters = NA,
                                              num_col_clusters = NA,
@@ -170,16 +195,30 @@ unweighted_bicluster_assignments <- function(U,
   )
 }
 
-#' Title
+#' Calculate least square estimate for bicluster centers given assignments
 #'
-#' @param X
-#' @param row_clusters
-#' @param col_clusters
+#' @param X data matrix to find centers for
+#' @param row_clusters cluster membership of rows
+#' @param col_clusters cluster membership of columns
 #'
-#' @return
+#' @return list with entries `fit` for fitted centers and `assignments` for bicluster labels
 #' @export
 #'
 #' @examples
+#' checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 100, shuffle = FALSE)
+#' bcbc_fit <- BCBC(checker$X, lambda = 0.05, gamma = 200)
+#' assignments <- bicluster_assignments(
+#'   bcbc_fit$U,
+#'   weights = bcbc_fit$w,
+#'   lambda = bcbc_fit$lambda,
+#'   percent_noise = 0.1
+#' )
+#' centers <- bicluster_centers(
+#'   checker$X,
+#'   assignments$row_clusters,
+#'   assignments$col_clusters
+#' )
+#' plot_fit(matrix_fit_to_df(centers$fit))
 bicluster_centers <- function(X, row_clusters, col_clusters) {
   bicluster_assignments <- outer(row_clusters, col_clusters, paste)
   bicluster_assignments[, col_clusters == 0] <- "0, 0"

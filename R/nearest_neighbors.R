@@ -14,21 +14,29 @@ create_edge_incidence_edges <- function(P, n) {
   return(E)
 }
 
-#' Title
+#' Build row and column info for usage with `BCBC`, `cobra` and subroutines.
 #'
-#' @param X
-#' @param k_row
-#' @param k_col
-#' @param phi
-#' @param approx
-#' @param rescale
-#' @param uniform
-#' @param hnsw_args
-#'
-#' @return
+#' @param X data matrix
+#' @param k_row number of nearest neighbors for rows
+#' @param k_col number of nearest neighbors for columns
+#' @param approximate use RcppHNSW for calculation
+#' @param hnsw_args passed to `RcppHNSW::hnsw_knn`
+#' @inheritParams build_weights_for_edges
+#' @seealso [knn_graph()]
+#' @seealso [knn_graph_approx()]
+#' @return list of row and column info similar to `knn_graph` return info
 #' @export
 #'
 #' @examples
+#' checker <- gen_checkerboard(n = 100,
+#'                             p = 100,
+#'                             num_row_clusters = 5,
+#'                             num_col_clusters = 5,
+#'                             p_extra = 25,
+#'                             shuffle = FALSE)
+#' fusion_wts <- fast_gkn_weights(t(checker$X), k_row = 4, k_col = 4, phi = 1)
+#' calc_fusion_term(fusion_wts$unique_row_edges, fusion_wts$w_row, checker$X, rows=FALSE)
+#' calc_fusion_term(fusion_wts$unique_col_edges, fusion_wts$w_col, checker$X, rows=TRUE)
 fast_gkn_weights <- function(X, k_row, k_col, phi,
                              approximate = FALSE,
                              rescale = TRUE,
@@ -54,19 +62,16 @@ fast_gkn_weights <- function(X, k_row, k_col, phi,
 
 }
 
-#' Title
+#' Calculate exact nearest neighbors for use with `BCBC`, `cobra` and subroutines.
 #'
-#' @param X
-#' @param k
-#' @param rescale
-#' @param uniform
-#' @param phi
+#' @param X data matrix
+#' @param k number of nearnest neighbors
+#' @inheritParams build_weights_for_edges
+#' @inherit build_weights_for_edges return
 #'
-#' @return
 #' @importFrom dbscan kNN
 #' @export
 #'
-#' @examples
 knn_graph <- function(X,
                       k,
                       rescale = FALSE,
@@ -86,21 +91,17 @@ knn_graph <- function(X,
 }
 
 
-#' Title
+#' Calculate approximate nearest neighbors for use with `BCBC`, `cobra` and subroutines.
 #'
-#' @param X
-#' @param k
-#' @param rescale
-#' @param uniform
-#' @param phi
-#' @param byrow
-#' @param hnsw_args
-#'
-#' @return
+#' @param X data matrix
+#' @param k number of nearest neighbors
+#' @param byrow calculate for rows instead of columns
+#' @param hnsw_args passed to `RcppHNSW::hnsw_knn`
+#' @inheritParams build_weights_for_edges
+#' @inherit build_weights_for_edges return
 #' @import RcppHNSW
 #' @export
 #'
-#' @examples
 knn_graph_approx <- function(X,
                              k,
                              rescale = FALSE,
@@ -135,17 +136,14 @@ knn_graph_approx <- function(X,
   )
 }
 
-#' Title
+#' Find geometric mediod and build star affinity graph
 #'
-#' @param X
-#' @param rescale
-#' @param uniform
-#' @param phi
+#' @param X data matrix
+#' @inheritParams build_weights_for_edges
+#' @inherit build_weights_for_edges return
 #'
-#' @return
 #' @export
 #'
-#' @examples
 geometric_medoid <- function(X,
                              rescale = FALSE,
                              uniform = FALSE,
@@ -177,17 +175,13 @@ geometric_medoid <- function(X,
 }
 
 
-#' Title
+#' Build completely connected affinity graph
 #'
-#' @param X
-#' @param rescale
-#' @param uniform
-#' @param phi
-#'
-#' @return
+#' @param X data matrix
+#' @inheritParams build_weights_for_edges
+#' @inherit build_weights_for_edges return
 #' @export
 #'
-#' @examples
 full_connectivity <- function(X,
                               rescale = NA,
                               uniform = FALSE,
@@ -223,76 +217,20 @@ full_connectivity <- function(X,
   )
 }
 
-#' Title
+#' Build list for usage with `cobra`.
 #'
-#' @param X
-#' @param cluster_assignments
+#' @param edges data frame describing
+#' @param distances corresponding to each edge
+#' @param uniform treat all edges as equal magnitude
+#' @param rescale weights and bandwidth by this factor
+#' @param phi bandwidth for Gaussian kernel
 #'
-#' @return
+#' @return list with
+#'   1. `weights` vector of edge weights
+#'   1. `E_row` sparse unweighted edge incidence matrix
+#'   1. `fusion` sum of fusion term when using the weights and distances
+#'   1. `unique_edges` data frame describing edge information
 #' @export
-#'
-#' @examples
-connected_oracle <- function(X, cluster_assignments) {
-  n <- nrow(X)
-  cluster_labels <- unique(cluster_assignments)
-
-  unique_edges <- tibble(
-    from_node = numeric(),
-    to_node = numeric(),
-    distance = numeric()
-  )
-  for(cluster in cluster_labels) {
-    cluster_indices <- which(cluster_assignments == cluster)
-    inside_cluster_edges <- combn(cluster_indices, 2)
-    unique_edges <- unique_edges |>
-      rbind(tibble(
-        from_node = inside_cluster_edges[1, ],
-        to_node = inside_cluster_edges[2, ],
-        distance = 0
-      ))
-  }
-  first_cluster_indices <- rep(0, length(cluster_labels))
-  i <- 1
-  for(cluster in cluster_labels) {
-    first_cluster_indices[i] <- min(which(cluster_assignments == cluster))
-    i <- i + 1
-  }
-
-  bridges <- combn(first_cluster_indices, 2)
-  for(bridge_index in 1:ncol(bridges)) {
-    unique_edges <- unique_edges |>
-      add_row(from_node = bridges[1, bridge_index],
-              to_node = bridges[2, bridge_index],
-              distance = sqrt(sum((X[bridges[1, bridge_index], ] -
-                                     X[bridges[2, bridge_index], ])^2)))
-  }
-
-  # Construct edge-incidence matrices
-  E_row <- create_edge_incidence_edges(
-    cbind(unique_edges$from_node, unique_edges$to_node),
-    n)
-
-  list(
-    weights = rep(1, nrow(unique_edges)),
-    E_row = E_row,
-    fusion = sum(unique_edges$distance),
-    unique_edges = unique_edges
-  )
-}
-
-
-#' Title
-#'
-#' @param edges
-#' @param distances
-#' @param uniform
-#' @param rescale
-#' @param phi
-#'
-#' @return
-#' @export
-#'
-#' @examples
 build_weights_for_edges <- function(edges,
                                     distances,
                                     uniform = FALSE,

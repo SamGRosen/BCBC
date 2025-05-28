@@ -2,7 +2,7 @@
 % Please edit documentation in R/bcbc.R
 \name{BCBC}
 \alias{BCBC}
-\title{Title}
+\title{Perform Biconvex Biclustering}
 \usage{
 BCBC(
   X,
@@ -10,7 +10,7 @@ BCBC(
   k_features = 4,
   k_samples = 4,
   gamma = 10,
-  phi = 0.05,
+  phi = 1,
   tmax = NA,
   tmax_cobra = 100,
   tmax_outer = 100,
@@ -20,12 +20,80 @@ BCBC(
   approx_neighbors = FALSE,
   hnsw_args = list(),
   progress = TRUE,
-  wts = NA
+  fusion_wts = NA,
+  init_U = X
 )
 }
 \arguments{
-\item{progress}{}
+\item{X}{data matrix}
+
+\item{lambda}{sparsity hyperparameter}
+
+\item{k_features}{number of nearest neighbors used to calculate feature affinity graph}
+
+\item{k_samples}{number of nearest neighbors used to calculate sample affinity graph}
+
+\item{gamma}{fusion hyperparameter}
+
+\item{phi}{bandwidth of affinity graph kernel}
+
+\item{tmax}{number of max iterations for COBRA and PALM}
+
+\item{tmax_cobra}{number of max iterations for COBRA}
+
+\item{tmax_outer}{number of max iterations for PALM}
+
+\item{tol}{for early termination}
+
+\item{recalculate_weights}{if TRUE use adaptive BCBC}
+
+\item{greedy_terminate}{terminate if objective function does not decrease after iteration}
+
+\item{approx_neighbors}{use approximate nearest neighbors for affinity graph}
+
+\item{hnsw_args}{passed to \code{fast_gkn_weights} for approximate NN calculation}
+
+\item{progress}{show progress}
+
+\item{fusion_wts}{use predetermined affinity graph}
+
+\item{init_U}{use this matrix for initial PALM iterations}
+}
+\value{
+list for BCBC fit including
+\enumerate{
+\item \code{U} fitted matrix
+\item \code{w} fitted weights
+\item \code{lambda}, \code{gamma}, \code{k_features}, \code{k_samples}, \code{phi}, \code{recalculate_weights}  input parameters
+\item \code{cobra_diffs} difference in \code{U} iterates
+\item \code{w_diffs} difference in \code{w} iterates
+\item \code{w_path} all \code{w} iterates
+\item \code{objective} value of objective function for all iterates
+\item \code{rss} weighted rss value for all iterates
+\item \code{row_fusion} row fusion penalties for all iterates
+\item \code{col_fusion} col fusion penalties for all iterates
+\item \code{time} to termination
+\item \code{col_residuals} unweighted residuals per column for all iterates
+\item \code{best_obj_w} best w at lowest objective found during iteration
+\item \code{best_obj_U} best U at lowest objective found during iteration
+}
 }
 \description{
-Title
+Perform Biconvex Biclustering
+}
+\examples{
+checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 100, shuffle = FALSE)
+bcbc_fit <- BCBC(checker$X, lambda = 0.05, gamma = 200)
+assignments <- bicluster_assignments(
+  bcbc_fit$U,
+  weights = bcbc_fit$w,
+  lambda = bcbc_fit$lambda,
+  percent_noise = 0.1
+)
+centers <- bicluster_centers(
+  checker$X,
+  assignments$row_clusters,
+  assignments$col_clusters
+)
+plot_fit(matrix_fit_to_df(centers$fit))
 }

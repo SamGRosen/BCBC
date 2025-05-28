@@ -2,7 +2,8 @@
 % Please edit documentation in R/utils.R
 \name{plot_fit}
 \alias{plot_fit}
-\title{Title}
+\title{Conveinence function for plotting matrix fits from \code{matrix_fit_to_df} and
+\code{bcbc_result_to_df}.}
 \usage{
 plot_fit(
   plot_df,
@@ -11,12 +12,43 @@ plot_fit(
   ylabel = "",
   fill_attr = "value",
   alpha_weight = FALSE,
+  weight_annotation = FALSE,
   bin_scale = FALSE
 )
 }
 \arguments{
-\item{bin_scale}{}
+\item{plot_df}{return value of \code{matrix_fit_to_df} or \code{bcbc_result_to_df}.}
+
+\item{title}{to display}
+
+\item{xlabel}{x-axis label to display}
+
+\item{ylabel}{y-axis label to display}
+
+\item{fill_attr}{color the entries based off this column from \code{plot_df}}
+
+\item{alpha_weight}{match opacity of columns with \code{weight} column from \code{plot_df}}
+
+\item{weight_annotation}{add a line plot annotating weight magnitude of columns}
+
+\item{bin_scale}{use a discrete but ordered color scale with this number of bins}
+}
+\value{
+ggplot object
 }
 \description{
-Title
+Conveinence function for plotting matrix fits from \code{matrix_fit_to_df} and
+\code{bcbc_result_to_df}.
+}
+\examples{
+checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 100, shuffle = TRUE)
+bcbc_fit <- BCBC(checker$X, lambda = 0.01, gamma = 100)
+as_df <- bcbc_result_to_df(bcbc_fit)
+plot_fit(as_df, title="Title", xlabel="columns", ylabel="rows", bin_scale = 5)
+plot_fit(as_df, title="Title", weight_annotation = TRUE)
+}
+\seealso{
+\code{\link[=matrix_fit_to_df]{matrix_fit_to_df()}}
+
+\code{\link[=bcbc_result_to_df]{bcbc_result_to_df()}}
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/nearest_neighbors.R
 \name{knn_graph_approx}
 \alias{knn_graph_approx}
-\title{Title}
+\title{Calculate approximate nearest neighbors for use with \code{BCBC}, \code{cobra} and subroutines.}
 \usage{
 knn_graph_approx(
   X,
@@ -15,8 +15,29 @@ knn_graph_approx(
 )
 }
 \arguments{
-\item{hnsw_args}{}
+\item{X}{data matrix}
+
+\item{k}{number of nearest neighbors}
+
+\item{rescale}{weights and bandwidth by this factor}
+
+\item{uniform}{treat all edges as equal magnitude}
+
+\item{phi}{bandwidth for Gaussian kernel}
+
+\item{byrow}{calculate for rows instead of columns}
+
+\item{hnsw_args}{passed to \code{RcppHNSW::hnsw_knn}}
+}
+\value{
+list with
+\enumerate{
+\item \code{weights} vector of edge weights
+\item \code{E_row} sparse unweighted edge incidence matrix
+\item \code{fusion} sum of fusion term when using the weights and distances
+\item \code{unique_edges} data frame describing edge information
+}
 }
 \description{
-Title
+Calculate approximate nearest neighbors for use with \code{BCBC}, \code{cobra} and subroutines.
 }

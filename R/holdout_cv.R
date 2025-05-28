@@ -1,22 +1,43 @@
-#' Title
+#' Perform cross-validation with a hold-out test set. Used to find optimal gamma
+#' hyperparameter.
 #'
-#' @param X
-#' @param holdout_size
-#' @param lambdas
-#' @param gammas
-#' @param k_samples
-#' @param k_features
-#' @param phis
-#' @param recalculate_weights
-#' @param tols
-#' @param tmax_outers
-#' @param tmax_inners
-#' @param ...
+#' @param X data matrix
+#' @param holdout_size percent of data to leave out
+#' @param lambdas passed to `BCBC_missing`
+#' @param gammas passed to `BCBC_missing`
+#' @param k_samples passed to `BCBC_missing`
+#' @param k_features passed to `BCBC_missing`
+#' @param phis passed to `BCBC_missing`
+#' @param recalculate_weights passed to `BCBC_missing`
+#' @param approx_neighbors passed to `BCBC_missing`
+#' @param hnsw_args passed to `BCBC_missing`
+#' @param tols passed to `BCBC_missing`
+#' @param tmax_hierarchy passed to `BCBC_missing`
+#' @param return_fits passed to `BCBC_missing`
+#' @param ... passed to `BCBC_missing`
 #'
-#' @return
+#' @return list with info
+#'   1. `all_runs` all returned runs from `BCBC_missing`
+#'   1. `gamma_cv_data` data frame of hyperparameters and cv metrics
+#'   1. `all_params` grid of hyperparameters used for fitting
+#'   1. `mask` of hold-out data
+#'   1. `holdout_size`, `tmax_hierarchy` input parameters
+#' @seealso [BCBC_missing()]
+#' @seealso [cv.BCBC()]
 #' @export
 #'
 #' @examples
+#' checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 100, shuffle = FALSE)
+#' gamma_cv <- cv.BCBC_holdout(
+#'   checker$X,
+#'   holdout_size = 0.2,
+#'   lambdas = c(0),
+#'   gammas = seq(50, 300, 50),
+#'   k_samples = 4,
+#'   k_features = 4,
+#'   recalculate_weights = T
+#' )
+#' View(gamma_cv$gamma_cv_data)
 cv.BCBC_holdout <- function(X,
                             holdout_size = 0.1,
                             lambdas = c(1),

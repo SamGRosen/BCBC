@@ -2,20 +2,43 @@
 % Please edit documentation in R/cv.R
 \name{get_all_cv_metrics}
 \alias{get_all_cv_metrics}
-\title{Title}
+\title{Utility method to get cv metrics for many BCBC fits. Use \code{cv.BCBC} instead.}
 \usage{
 get_all_cv_metrics(
   X,
   bcbc_runs,
   all_params = data.frame(),
-  percent_noise = 0.25,
+  percent_noise = c(0.25),
   num_row_clusters = NA,
   num_col_clusters = NA
 )
 }
 \arguments{
-\item{num_col_clusters}{}
+\item{X}{data matrix}
+
+\item{bcbc_runs}{list of bcbc runs to use}
+
+\item{all_params}{grid of hyperparameters}
+
+\item{percent_noise}{vector of potential percent_noises to build biclusters}
+
+\item{num_row_clusters}{If set, tries to calculate a threshold to result in this many row clusters}
+
+\item{num_col_clusters}{If set, tries to calculate a threshold to result in this many column clusters}
+}
+\value{
+list with
+\enumerate{
+\item \code{all_runs} used for calculation
+\item \code{cv_data} all metrics used for cv
+\item \code{row_clusters} all row clusters
+\item \code{col_clusters} all column clusters
+\item \code{all_params} hyperparameter grid
+}
 }
 \description{
-Title
+Utility method to get cv metrics for many BCBC fits. Use \code{cv.BCBC} instead.
+}
+\seealso{
+\code{\link[=cv.BCBC]{cv.BCBC()}}
 }
