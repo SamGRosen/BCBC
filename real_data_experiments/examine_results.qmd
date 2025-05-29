@@ -4,10 +4,19 @@ library(clusterSim)
 
 eval_cluster <- function(true_labels, fitted_mat, fitted_labels) {
   print(c("Silhoutte:", index.S(dist(fitted_mat), true_labels)))
-  print(c("DB:", index.DB(fitted_mat, true_labels)$DB))
+  # print(c("DB:", index.DB(fitted_mat, true_labels)$DB))
   print(c("ARI:",
         igraph::compare(fitted_labels,
                         true_labels, method = "adjusted.rand")))
+  print(c("NMI:",
+      igraph::compare(fitted_labels,
+                      true_labels, method = "nmi")))
+  print(c("VI:",
+        igraph::compare(fitted_labels,
+                        true_labels, method = "vi")))
+  print(c("split.join:",
+        igraph::compare(fitted_labels,
+                        true_labels, method = "split.join")))
 }
 ```
 
@@ -24,10 +33,12 @@ srbct_plot <- plot_fit(matrix_fit_to_df(srbct,
 ## BCBC
 
 ```{r}
-BCBC_srbct_obj <- readRDS("/cwork/sgr26/BCBC_ADAPTIVE_srbct_17525585.RDS")
+BCBC_srbct_obj <- readRDS("/cwork/sgr26/BCBC_ADAPTIVE_srbct_20963310.RDS")
 BCBC_srbct <- bcbc_extractor(BCBC_srbct_obj)
 BCBC_srbct_plot <- plot_fit(matrix_fit_to_df(BCBC_srbct$fitted_mat,
-                                             labels = srbct_labels))
+                                             labels = srbct_labels,
+                                             weights = BCBC_srbct$fitted_feature_coefs,
+                                             filter_weight = 1/2308))
 eval_cluster(srbct_labels, BCBC_srbct$fitted_mat, BCBC_srbct$row_groups)
 ```
 
@@ -85,12 +96,12 @@ leukemia_plot <- plot_fit(matrix_fit_to_df(leukemia,
 ## BCBC
 
 ```{r}
-BCBC_leukemia_obj <- readRDS("/cwork/sgr26/BCBC_ADAPTIVE_leukemia_18011281.RDS")
+BCBC_leukemia_obj <- readRDS("/cwork/sgr26/BCBC_ADAPTIVE_leukemia_25648400.RDS")
 BCBC_leukemia <- bcbc_extractor(BCBC_leukemia_obj)
 BCBC_leukemia_plot <- plot_fit(matrix_fit_to_df(BCBC_leukemia$fitted_mat,
-                                             labels = leukemia_labels))
+                                                labels = leukemia_labels,
+                                                weights = BCBC_leukemia$fitted_feature_coefs))
 eval_cluster(leukemia_labels, BCBC_leukemia$fitted_mat, BCBC_leukemia$row_groups)
-
 ```
 
 ## BCEL
@@ -136,7 +147,7 @@ igraph::compare(SCBiclust_leukemia$row_groups, leukemia_labels, method = "adjust
 ```{r}
 
 lymphoma <- t(read.csv("./data/lymphoma.x.txt", header = FALSE, sep = " "))
-lymphoma <- scale(lymphoma)
+# lymphoma <- scale(lymphoma)
 lymphoma_labels <- read.csv("./data/lymphoma.y.txt", header = FALSE, sep = " ")$V1
 lymphoma_plot <- plot_fit(matrix_fit_to_df(lymphoma,
                                            labels = lymphoma_labels))
@@ -145,11 +156,14 @@ lymphoma_plot <- plot_fit(matrix_fit_to_df(lymphoma,
 ## BCBC
 
 ```{r}
-BCBC_lymphoma_obj <- readRDS("/cwork/sgr26/BCBC_ADAPTIVE_lymphoma_18313449.RDS")
+BCBC_lymphoma_obj <- readRDS("/cwork/sgr26/BCBC_ADAPTIVE_lymphoma_25633376.RDS")
 BCBC_lymphoma <- bcbc_extractor(BCBC_lymphoma_obj)
 BCBC_lymphoma_plot <- plot_fit(matrix_fit_to_df(BCBC_lymphoma$fitted_mat,
-                                             labels = lymphoma_labels))
-igraph::compare(BCBC_lymphoma$row_groups, lymphoma_labels, method = "adjusted.rand")
+                                                labels = lymphoma_labels,
+                                                weights = BCBC_lymphoma$fitted_feature_coefs))
+eval_cluster(lymphoma_labels, BCBC_lymphoma$fitted_mat, BCBC_lymphoma$row_groups)
+
+# modifed <- modify_cv(BCBC_lymphoma_obj$bcbc_cv, 3, NA)
 
 ```
 
@@ -198,7 +212,7 @@ igraph::compare(SCBiclust_lymphoma$row_groups, lymphoma_labels, method = "adjust
 ```{r}
 
 colon <- t(read.csv("./data/colon.x.txt", header = FALSE, sep = " "))
-# colon <- scale(colon)
+colon <- scale(colon)
 colon_labels <- read.csv("./data/colon.y.txt", header = FALSE, sep = " ")$V1
 colon_plot <- plot_fit(matrix_fit_to_df(colon,
                                         labels = colon_labels))
@@ -207,7 +221,7 @@ colon_plot <- plot_fit(matrix_fit_to_df(colon,
 ## BCBC
 
 ```{r}
-BCBC_colon_obj <- readRDS("/cwork/sgr26/BCBC_ADAPTIVE_colon_17499267.RDS")
+BCBC_colon_obj <- readRDS("/cwork/sgr26/BCBC_ADAPTIVE_colon_25633374.RDS")
 BCBC_colon <- bcbc_extractor(BCBC_colon_obj)
 BCBC_colon_plot <- plot_fit(matrix_fit_to_df(BCBC_colon$fitted_mat,
                                              labels = colon_labels))
@@ -265,9 +279,28 @@ WangBreast2005_plot <- plot_fit(matrix_fit_to_df(WangBreast2005,
 # Lung
 
 ```{r}
-BhattachereeLung2001 <- t(read.csv("./data/BhattacherjeeLung2001.txt", header = FALSE, sep = "\t"))
+BhattachereeLung2001 <- t(read.csv("./data/BhattacherjeeLung2001.txt", header = FALSE, sep = " "))
 BhattachereeLung2001 <- scale(BhattachereeLung2001)
 BhattachereeLung2001_labels <- read.csv("./data/BhattacherjeeLung2001.y.txt", header = FALSE, sep = " ")$V1
 BhattachereeLung2001_plot <- plot_fit(matrix_fit_to_df(BhattachereeLung2001,
-                                                 labels = BhattachereeLung2001_labels))
+                                                       labels = BhattachereeLung2001_labels))
+```
+
+# BCBC
+
+```{r}
+BCBC_lung_obj <- readRDS("/cwork/sgr26/BCBC_ADAPT_APPROX_BhattacherjeeLung20012_20967809.RDS")
+BCBC_lung <- bcbc_extractor(BCBC_lung_obj)
+BCBC_lung_plot <- plot_fit(matrix_fit_to_df(BCBC_lung$fitted_mat,
+                                            labels = BhattachereeLung2001_labels))
+
+
+igraph::compare(BCBC_lung$row_groups, BhattachereeLung2001_labels, method = "adjusted.rand")
+```
+
+```{r}
+BCBC_lung_plot10 <- plot_fit(matrix_fit_to_df(BCBC_lung_obj$bcbc_cv$all_runs[[10]]$U,
+                                            labels = BhattachereeLung2001_labels,
+                                            weights = BCBC_lung_obj$bcbc_cv$all_runs[[10]]$w))
+
 ```

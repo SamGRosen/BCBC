@@ -13,7 +13,6 @@ pwd
 
 echo $SLURM_JOB_ID
 echo $METHOD
-echo $DATASET
 
-Rscript /hpc/home/sgr26/BCBC/real_data_experiments/data_experiment.R $SLURM_JOB_ID \
-  $METHOD $DATASET
+Rscript /hpc/home/sgr26/BCBC/real_data_experiments/lymphoma_experiment.R $SLURM_JOB_ID \
+  $METHOD

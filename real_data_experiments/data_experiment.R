@@ -1,6 +1,5 @@
 library(BCBC)
 library(dplyr)
-library(future.apply)
 
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -11,8 +10,6 @@ stopifnot(length(args) == 3)
 JOB_ID <- args[1]
 METHOD <- args[2]
 DATASET <- args[3]
-
-plan(sequential, split=TRUE)
 
 matched_algo <- match(toupper(METHOD), c("BCBC_ADAPTIVE", "BCBC",
                                          "BCEL", "COBRA", "SPARSEBC",
@@ -35,77 +32,93 @@ matched_data <- pmatch(
   datasets
 )
 
+print(datasets)
+print(DATASET)
+print(matched_data)
 X <- t(read.csv(paste0("./data/", datasets[matched_data]), header = FALSE, sep = " "))
 X <- scale(X)
 
-
-k_samples = 4
-k_features = 10
-phi = 0.25
+# BCBC params
+k_samples = 10
+k_features = 20
+phi = 1
+holdout_size = 0.25
+tmax_hierarchy = c(2, 75, 300)
+fit_tmax_hierarchy = c(4 * tmax_hierarchy[2], tmax_hierarchy[3])
 
 p <- ncol(X)
+n <- nrow(X)
 
-bcbc_gammas <- p * 2 ^ seq(-2, 1, 0.5)  # change back to more, saving time in cv
-bcbc_gammas <- p * 2 ^ seq(0, 1, 0.25)  # change back to more, saving time in cv
+gammas <- n * 2 ^ seq(-1, 6, 0.5)
 
-bcbc_lambdas <- c(0, 2 ^ seq(-9, -1, 1))
+lambdas <- seq(0, 200, 10) / p
+
+debug <- TRUE
+
 
 if(matched_algo == 1) {
   result <- cv.BCBC_holdout(
     X,
-    holdout_size = 0.2,
+    holdout_size = holdout_size,
     lambdas = c(0),
-    gammas = bcbc_gammas,
+    gammas = gammas,
     k_samples = c(k_samples),
     k_features = c(k_features),
     recalculate_weights = c(TRUE),
     phis = c(phi),
-    tols = c(10 ^ -2.5),
-    tmax_hierarchy = c(10, 50, 50)
+    tols = c(10 ^ -4),
+    tmax_hierarchy = tmax_hierarchy,
+    return_fits = debug
   )
 
   best_gamma <- result$gamma_cv_data |> slice(which.min(rss_heldout))
 
   print(best_gamma)
 
-  result$bcbc_cv <- cv.BCBC(
+  result$lambda_cv <- cv.BCBC(
     X,
     gammas = c(best_gamma$gamma),
-    lambdas = bcbc_lambdas,
+    lambdas = lambdas,
     k_samples = c(k_samples),
     k_features = c(k_features),
     phis = c(phi),
+    percent_noise = seq(0.025, 0.50, 0.025),
     recalculate_weights = c(TRUE),
     tols = c(1e-4),
-    tmax_outers = c(500)
+    tmax_outer = fit_tmax_hierarchy[1],
+    tmax_cobra = fit_tmax_hierarchy[2]
   )
 } else if(matched_algo == 2) {
   result <- cv.BCBC_holdout(
     X,
-    holdout_size = 0.15,
+    holdout_size = holdout_size,
     lambdas = c(0),
-    gammas = bcbc_gammas,
+    gammas = gammas,
     k_samples = c(k_samples),
     k_features = c(k_features),
+    recalculate_weights = c(FALSE),
     phis = c(phi),
-    tols = c(10 ^ -2.5),
-    tmax_hierarchy = c(15, 150, 50)
+    tols = c(10 ^ -4),
+    tmax_hierarchy = c(2, 150, 250),
+    return_fits = debug
   )
 
   best_gamma <- result$gamma_cv_data |> slice(which.min(rss_heldout))
 
   print(best_gamma)
 
-  result$bcbc_cv <- cv.BCBC(
+  result$lambda_cv <- cv.BCBC(
     X,
     gammas = c(best_gamma$gamma),
-    lambdas = bcbc_lambdas,
+    lambdas = lambdas,
     k_samples = c(k_samples),
     k_features = c(k_features),
     phis = c(phi),
+    percent_noise = seq(0.025, 0.50, 0.025),
     recalculate_weights = c(FALSE),
     tols = c(1e-4),
-    tmax_outers = c(500)
+    tmax_outer = fit_tmax_hierarchy[1],
+    tmax_cobra = fit_tmax_hierarchy[2]
   )
 } else if (matched_algo == 3) {
   library(BCEL)
@@ -194,42 +207,45 @@ if(matched_algo == 1) {
 } else if(matched_algo == 7) {
   result <- cv.BCBC_holdout(
     X,
-    holdout_size = 0.10,
+    holdout_size = holdout_size,
     lambdas = c(0),
-    gammas = bcbc_gammas,
+    gammas = gammas,
     k_samples = c(k_samples),
     k_features = c(k_features),
     phis = c(phi),
-    tols = c(10 ^ -2.5),
-    tmax_hierarchy = c(10, 50, 50),
+    tols = c(10 ^ -4),
+    tmax_hierarchy = tmax_hierarchy,
     recalculate_weights = c(TRUE),
-    # approx_neighbors = c(TRUE),
-    # hnsw_args = list(
-    #   ef = 50,
-    #   M = 32,
-    #   n_threads = 4
-    # )
+    approx_neighbors = c(TRUE),
+    hnsw_args = list(
+      ef = 50,
+      M = 32,
+      n_threads = 4
+    ),
+    return_fits = debug
   )
 
   best_gamma <- result$gamma_cv_data |> slice(which.min(rss_heldout))
 
   print(best_gamma)
 
-  result$bcbc_cv <- cv.BCBC(
+  result$lambda_cv <- cv.BCBC(
     X,
     gammas = c(best_gamma$gamma),
-    lambdas = bcbc_lambdas,
+    lambdas = lambdas,
     k_samples = c(k_samples),
     k_features = c(k_features),
     phis = c(phi),
     recalculate_weights = c(TRUE),
     tols = c(1e-4),
-    tmax_outers = c(500),
+    tmax_outer = fit_tmax_hierarchy[1],
+    tmax_cobra = fit_tmax_hierarchy[2],
     approx_neighbors = c(TRUE),
+    percent_noise = seq(0.025, 0.50, 0.025),
     hnsw_args = list(
       ef = 100,
       M = 32,
-      n_threads = 12
+      n_threads = 4
     )
   )
 } else {

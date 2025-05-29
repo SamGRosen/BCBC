@@ -1,0 +1,84 @@
+# Lymphoma
+
+```{r}
+
+lymphoma <- t(read.csv("./data/lymphoma.x.txt", header = FALSE, sep = " "))
+lymphoma <- scale(lymphoma)
+lymphoma_labels <- read.csv("./data/lymphoma.y.txt", header = FALSE, sep = " ")$V1
+lymphoma_plot <- plot_fit(matrix_fit_to_df(lymphoma,
+                                           labels = lymphoma_labels))
+```
+
+```{r}
+BCBC_lymphoma_obj <- readRDS("/cwork/sgr26/BCBC_ADAPTIVE_lymphoma_25687372.RDS")
+```
+
+```{r}
+BCBC_lymphoma <- bcbc_extractor(BCBC_lymphoma_obj)
+plot_fit(matrix_fit_to_df(BCBC_lymphoma$fitted_mat,
+                          labels = lymphoma_labels,
+                          weights = BCBC_lymphoma$fitted_feature_coefs))
+plot(sort(BCBC_lymphoma$fitted_feature_coefs))
+
+plot_fit(matrix_fit_to_df(BCBC_lymphoma$fitted_mat,
+                          labels = lymphoma_labels,
+                          weights = BCBC_lymphoma$fitted_feature_coefs,
+                          filter_weight = 4e-4))
+
+plot_fit(bcbc_result_to_df(BCBC_lymphoma_obj$lambda_cv$all_runs[[18]],
+                           labels = lymphoma_labels))
+```
+
+
+
+# Leukemia
+
+```{r}
+
+leukemia <- t(read.csv("./data/leukemia.x.txt", header = FALSE, sep = " "))
+leukemia <- scale(leukemia)
+leukemia_labels <- read.csv("./data/leukemia.y.txt", header = FALSE, sep = " ")$V1
+leukemia_plot <- plot_fit(matrix_fit_to_df(leukemia,
+                                           labels = leukemia_labels))
+```
+
+
+```{r}
+BCBC_leukemia_obj <- readRDS("/cwork/sgr26/BCBC_ADAPTIVE_leukemia_25619804.RDS")
+```
+
+```{r}
+BCBC_leukemia <- bcbc_extractor(BCBC_leukemia_obj)
+plot_fit(matrix_fit_to_df(BCBC_leukemia$fitted_mat,
+                          labels = leukemia_labels,
+                          weights = BCBC_leukemia$fitted_feature_coefs))
+plot(sort(BCBC_leukemia$fitted_feature_coefs))
+
+plot_fit(matrix_fit_to_df(BCBC_leukemia$fitted_mat,
+                          labels = leukemia_labels,
+                          weights = BCBC_leukemia$fitted_feature_coefs,
+                          filter_weight = 0.0005))
+
+plot_fit(bcbc_result_to_df(BCBC_leukemia_obj$lambda_cv$all_runs[[20]],
+                           labels = leukemia_labels))
+```
+
+```{r}
+BCBC_leukemia_obj <- readRDS("/cwork/sgr26/BCBC_ADAPTIVE_leukemia_25648400.RDS")
+```
+
+```{r}
+BCBC_leukemia <- bcbc_extractor(BCBC_leukemia_obj)
+plot_fit(matrix_fit_to_df(BCBC_leukemia$fitted_mat,
+                          labels = leukemia_labels,
+                          weights = BCBC_leukemia$fitted_feature_coefs))
+plot(sort(BCBC_leukemia$fitted_feature_coefs))
+
+plot_fit(matrix_fit_to_df(BCBC_leukemia$fitted_mat,
+                          labels = leukemia_labels,
+                          weights = BCBC_leukemia$fitted_feature_coefs,
+                          filter_weight = 0.0005))
+
+plot_fit(bcbc_result_to_df(BCBC_leukemia_obj$lambda_cv$all_runs[[20]],
+                           labels = leukemia_labels))
+```
