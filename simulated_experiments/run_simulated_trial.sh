@@ -1,8 +1,9 @@
 #!/bin/bash
 #SBATCH --output=./slurm-output/%A_%a.out
-#SBATCH --cpus-per-task=4
-#SBATCH --mem-per-cpu=3G
-#SBATCH --array=1-120
+#SBATCH --cpus-per-task=1
+#SBATCH --mem-per-cpu=6G
+#SBATCH --array=1-160
+#SBATCH --account=dctrl-sgr26
 
 module load R/4.4.0
 module load GLPK/5.0

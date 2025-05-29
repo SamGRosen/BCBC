@@ -305,6 +305,7 @@ cobra_preprocess_extractor <- function(cobra_result) {
 bcel_extractor <- function(bcel_result) {
   to_return <- overlap_to_groups(abs(bcel_result$U) > 0, abs(bcel_result$V) > 0)
   to_return$fitted_mat <- bcel_result$U %*% t(bcel_result$V)
+  to_return$fitted_feature_coefs <- apply(bcel_result$V, 1, function(w) { as.numeric(sum(w > 0) > 0)})
   return(to_return)
 }
 
@@ -313,17 +314,21 @@ biclust_extractor <- function(biclust_obj) {
 }
 
 sparseBC_extractor <- function(sparseBC_run) {
+  min_col_sd = min(apply(sparseBC_run$mus, 2, function(w) { sd(w) }))
   list(
     row_groups = sparseBC_run$Cs,
     col_groups = sparseBC_run$Ds,
-    fitted_mat = sparseBC_run$mus
+    fitted_mat = sparseBC_run$mus,
+    fitted_feature_coefs = as.numeric(apply(sparseBC_run$mus, 2, function(w) { abs(sd(w) - min_col_sd) > 1e-10 }))
   )
 }
 
 scbiclust_extractor <- function(scbiclust_result) {
   stacked_rows <- do.call(rbind, scbiclust_result$which.x)
   stacked_cols <- do.call(rbind, scbiclust_result$which.y)
-  overlap_to_groups(t(stacked_rows), t(stacked_cols))
+  to_return <- overlap_to_groups(t(stacked_rows), t(stacked_cols))
+  to_return$fitted_feature_coefs = as.numeric(apply(stacked_cols, 2, sum) > 0)
+  to_return
 }
 
 dct_extractor <- identity

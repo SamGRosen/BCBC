@@ -89,7 +89,7 @@ run_sparsebc <- function(X, gammas) {
 }
 
 all_sparsebc_results = list()
-for(checker in 1:66) {
+for(checker in 1:160) {
   print(c(checker, as.character(Sys.time())))
 
   all_sparsebc_results[[checker]] <-

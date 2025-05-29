@@ -2,9 +2,9 @@ library(tidyverse)
 source("simulated_experiments/simulation_helpers.R")
 
 # all_checkers <- generate_checkers_SNR(2024)
-# all_checkers <- generate_checkers(2024)
+all_checkers <- generate_checkers(2024)
 
-pattern <- "BCBC_NO_SCALE_25531274"
+pattern <- "BCBC_NO_SCALE_OR_ADAPT_25904571"
 
 print(paste("Getting paths for pattern", pattern))
 
@@ -17,7 +17,7 @@ print(paste("Reading", length(paths_to_combine), "RDS files"))
 
 all_rds <- list()
 
-num_chunks <- 2
+num_chunks <- 10
 
 partition <- split(seq_along(paths_to_combine),
                    sample(1:num_chunks, length(paths_to_combine), replace=T))
@@ -44,7 +44,7 @@ for(chunk in 1:num_chunks) {
     rbind(get_all_checker_results(all_checkers, chunk_rds, bcbc_extractor))
 
   print(paste("Garbage collecting", chunk))
-  rm(chunk_rds)
+  # rm(chunk_rds)
   gc()
 }
 

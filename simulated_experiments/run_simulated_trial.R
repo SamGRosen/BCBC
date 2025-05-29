@@ -30,7 +30,7 @@ p <- ncol(all_checkers[[ARRAY_ID]]$X)
 k_samples <- 5
 k_features <- 5
 phi <- 1
-lambdas <- seq(0, 100, 3) / p
+lambdas <- seq(0, 160, 4) / p
 gammas = n * 1.5 ^ seq(-4, 4, 1)
 
 holdout_out_tmax_hierarchy = c(2, 200, 200)

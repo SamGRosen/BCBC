@@ -47,6 +47,13 @@ all_results <- bind_rows(list(
     ),
     scbiclust_extractor
   ),
+  # `SC-Biclust*` = get_all_checker_results(
+  #   all_checkers,
+  #   readRDS(
+  #     "~/BCBC/simulated_experiments/rds_files/all_scbiclust_results2024-10-18 15:13:16.317519.RDS"
+  #   ),
+  #   scbiclust_extractor
+  # ),
   # PLAID = get_all_checker_results(
   #   all_checkers,
   #   readRDS(
@@ -57,30 +64,46 @@ all_results <- bind_rows(list(
   SparseBC = get_all_checker_results(
     all_checkers,
     readRDS(
-      # "~/BCBC/simulated_experiments/rds_files/all_sparsebc_results2024-10-18 15:05:36.032485.RDS"
-      "~/BCBC/simulated_experiments/rds_files/all_sparsebc_results_with_cv2025-01-27 02:38:36.248495.RDS"
+      "~/BCBC/simulated_experiments/rds_files/all_sparsebc_results_with_cv2025-02-14 06:42:11.430309.RDS"
     ),
     sparseBC_extractor
   ),
-  `SparseBC Oracle` = get_all_checker_results(
-    all_checkers,
-    readRDS(
-      "~/BCBC/simulated_experiments/rds_files/all_sparsebc_results2024-10-18 15:05:36.032485.RDS"
-    ),
-    sparseBC_extractor
-  ),
-  COBRA = read.csv("~/BCBC/simulated_experiments/rds_files/COBRA_25503471.csv"),
-  `COBRA PREPROCESS` = read.csv("~/BCBC/simulated_experiments/rds_files/COBRA_PREPROCESS_25503263.csv"),
-  BCEL = read.csv("~/BCBC/simulated_experiments/rds_files/BCEL_18012755.csv"),
-  `Adaptive BCBC` = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_NO_SCALE_25426406.csv"),
-  BCBC = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_NO_SCALE_OR_ADAPT_25426391.csv"),
-  `ANN BCBC` = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_ADAPT_APPROX_25426415.csv")
+  # `SparseBC*` = get_all_checker_results(
+  #   all_checkers,
+  #   readRDS(
+  #     "~/BCBC/simulated_experiments/rds_files/all_sparsebc_results2024-10-18 15:05:36.032485.RDS"
+  #   ),
+  #   sparseBC_extractor
+  # ),
+  # COBRA = read.csv("~/BCBC/simulated_experiments/rds_files/COBRA_25503471.csv"),
+  `COBRA` = read.csv("~/BCBC/simulated_experiments/rds_files/COBRA_PREPROCESS_25503263.csv"),
+  BCEL = read.csv("~/BCBC/simulated_experiments/rds_files/BCEL_25904516.csv"),
+  # `Adaptive BCBC` = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_NO_SCALE_25426406.csv"),
+  `Adaptive BCBC` = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_NO_SCALE_25904599.csv"),
+  BCBC = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_NO_SCALE_OR_ADAPT_25904571.csv"),
+  # `ANN BCBC` = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_ADAPT_APPROX_25426415.csv")
+  `ANN BCBC` = read.csv("~/BCBC/simulated_experiments/rds_files/BCBC_ADAPT_APPROX_25904598.csv")
 ),
 .id = "algorithm")
 
 ```
 
 ```{r}
+
+color_scheme = c(`Adaptive BCBC` = "#01498a",
+                 `ANN BCBC` = "#0061b8",
+                 `BCBC` = "#0083f7",
+                 `COBRA` = "#e31a1c",
+                 `COBRA*` = "#e31a1c",
+                 `SparseBC` = "#ff7f00",
+                 `SparseBC*` = "#ff7f00",
+                 `BCEL` = "#b2008a",
+                 `SC-Biclust` = "#33a02c",
+                 `SC-Biclust*` = "#33a02c",
+                 `DTC` = "#fdbf6f",
+                 `PLAID` = "#fb9a99",
+                 `S4VD` = "#b2df8a")
+
 se_filtered <- function(vals) {
   vals <- vals[is.finite(vals)]
   sd(vals) / sqrt(length(vals))
@@ -107,7 +130,7 @@ all_results <- all_results |>
   relocate(adjusted.rand_bicluster_harmonic, .after = adjusted.rand_bicluster_true)
   
 squash_trials <- all_results |>
-  group_by(p, extra_dim, algorithm) |>
+  group_by(p, algorithm) |>
   summarise(across(feature_recall:col_ch, list(mean=mean, se=se)))
 
 plot_methods <- function(metric, label=metric) {
@@ -116,50 +139,106 @@ plot_methods <- function(metric, label=metric) {
                   ymax = .data[[paste0(metric, "_mean")]] + 1.96 * .data[[paste0(metric, "_se")]],
                   fill = algorithm),
               alpha = 0.20, linetype = "blank") + 
-  geom_line(width=1.5) +
+  geom_line(linewidth=1) +
   geom_point(size=2.5) +
   labs(y = label, x = "Extra Noisy Features", color="Algorithm", fill="Algorithm") + 
-  scale_color_brewer(palette = "Paired") +
-  scale_fill_brewer(palette = "Paired") +
+  # scale_color_brewer(palette = "Paired") +
+  # scale_fill_brewer(palette = "Paired") +
+  scale_fill_manual(values = color_scheme) +
+  scale_color_manual(values = color_scheme) +
   scale_x_continuous(breaks = seq(0, 900, 100)) + 
   theme_minimal()
 }
 
-plot_methods("adjusted.rand_row", "Row ARI")
+# plot_methods("adjusted.rand_row", "Row ARI")
 # ggsave("~/BCBC/simulated_experiments/figures/row_ari.png")
 
-plot_methods("adjusted.rand_col_true", "True Column ARI")
+# plot_methods("adjusted.rand_col_true", "True Column ARI")
 # ggsave("~/BCBC/simulated_experiments/figures/true_col_ari.png")
 
-plot_methods("adjusted.rand_col", "All Column ARI")
+# plot_methods("adjusted.rand_col", "All Column ARI")
 # ggsave("~/BCBC/simulated_experiments/figures/col_ari.png")
 
-plot_methods("true_err", "Error")
+# plot_methods("true_err", "Error")
 plot_methods("feature_f1", "F1 Score")
+# plot_methods("feature_recall", "Recall")
+# plot_methods("feature_precision", "Precision")
 # plot_methods("row_silhouette")
 # plot_methods("col_silhouette")
-plot_methods("adjusted.rand_bicluster", "Bicluster ARI")
+# plot_methods("adjusted.rand_bicluster", "Bicluster ARI")
 # ggsave("~/BCBC/simulated_experiments/figures/simulation1_bicluster_ari.png")
 
-plot_methods("adjusted.rand_bicluster_true", "True Bicluster ARI")
+# plot_methods("adjusted.rand_bicluster_true", "True Bicluster ARI")
 # ggsave("~/BCBC/simulated_experiments/figures/simulation1_true_bicluster_ari.png")
 
 
-plot_methods("adjusted.rand_bicluster_harmonic", "Harmonic Bicluster ARI")
+# plot_methods("adjusted.rand_bicluster_harmonic", "Harmonic Bicluster ARI")
 # ggsave("~/BCBC/simulated_experiments/figures/simulation1_harmonic_bicluster_ari.png")
+
+```
+
+```{r}
+ggplot(squash_trials |> filter(
+  algorithm %in% c("DTC", "S4VD", "SC-Biclust", "PLAID",
+                   "SparseBC", "COBRA", "BCEL", "Adaptive BCBC",
+                   "BCBC", "ANN BCBC")
+), aes(x=p - 200, y=.data[[paste0("adjusted.rand_bicluster_true", "_mean")]], color=algorithm)) +
+  geom_ribbon(aes(ymin = .data[[paste0("adjusted.rand_bicluster_true", "_mean")]] - 1.96 * .data[[paste0("adjusted.rand_bicluster_true", "_se")]],
+                  ymax = .data[[paste0("adjusted.rand_bicluster_true", "_mean")]] + 1.96 * .data[[paste0("adjusted.rand_bicluster_true", "_se")]],
+                  fill = algorithm),
+              alpha = 0.20, linetype = "blank") + 
+  geom_line(linewidth=1) +
+  geom_point(size=2.5) +
+  labs(y = "True Bicluster ARI", x = "Extra Noisy Features", color="Algorithm", fill="Algorithm") + 
+  scale_fill_manual(values = color_scheme) +
+  scale_color_manual(values = color_scheme) +
+  scale_x_continuous(breaks = seq(0, 900, 100)) + 
+  # ggtitle("General Comparison of Methods") +
+  theme_minimal()
+
+ggsave("~/BCBC/simulated_experiments/figures/simulation1_basic_true_bicluster_ari.png")
 
 ```
 
 
 ```{r}
+ggplot(squash_trials |> filter(
+  algorithm %in% c("DTC", "SC-Biclust*",
+                   "SparseBC*", "COBRA*", "Adaptive BCBC",
+                   "ANN BCBC")
+), aes(x=p - 200, y=.data[[paste0("adjusted.rand_bicluster_true", "_mean")]], color=algorithm)) +
+  geom_ribbon(aes(ymin = .data[[paste0("adjusted.rand_bicluster_true", "_mean")]] - 1.96 * .data[[paste0("adjusted.rand_bicluster_true", "_se")]],
+                  ymax = .data[[paste0("adjusted.rand_bicluster_true", "_mean")]] + 1.96 * .data[[paste0("adjusted.rand_bicluster_true", "_se")]],
+                  fill = algorithm),
+              alpha = 0.20, linetype = "blank") + 
+  geom_line(linewidth=1) +
+  geom_point(size=2.5) +
+  labs(y = "True Bicluster ARI", x = "Extra Noisy Features", color="Algorithm", fill="Algorithm") + 
+  scale_fill_manual(values = color_scheme) +
+  scale_color_manual(values = color_scheme) +
+  scale_x_continuous(breaks = seq(0, 900, 100)) + 
+  scale_y_continuous(breaks = seq(0, 1, 0.25)) + 
+  ggtitle("Comparison of Strongest Methods with Oracle Information") +
+  theme_minimal()
+
+ggsave("~/BCBC/simulated_experiments/figures/simulation1_oracle_true_bicluster_ari.png")
+
+```
+
+```{r}
 ggplot(all_results |>
-         filter(grepl("BCBC", algorithm) | grepl("PRE", algorithm) ) |>
+         filter(grepl("BCBC", algorithm) | 
+                  grepl("COBRA", algorithm) | 
+                  grepl("SparseBC", algorithm) | 
+                  grepl("SC-Biclust", algorithm) |
+                  grepl("BCEL", algorithm)) |>
          filter(p > 200),
        aes(x=factor(p - 200), y=feature_auc, color=algorithm)) +
   geom_boxplot(coef = 1.25) +
   # geom_point() +
   labs(y = "AUC Score", x = "Extra Noisy Features", color="Algorithm") + 
-  scale_color_brewer(palette = "Paired") +
+  scale_color_manual(values = color_scheme) +
+  ggtitle("AUC of Feature Selection Mechanism") +
   theme_minimal()
   # annotate("segment", x = seq(1.5, 9.5, 1), xend = seq(1.5, 9.5, 1), 
   #          y = 0, yend = 1, 
@@ -263,27 +342,27 @@ squash_trials_SNR <- squash_trials_SNR |>
 ```{r}
 
 sim2_ari <- ggplot(squash_trials_SNR, aes(x = factor(n), y = factor(noise_level))) +
-  geom_tile(aes(fill = adjusted.rand_bicluster_harmonic_mean)) +
-  geom_text(aes(label = round(adjusted.rand_bicluster_harmonic_mean, digits = 3),
-                fontface = ifelse(is_highest_harmonic_bicluster_ari, "bold", "plain")),
-            size=ifelse(squash_trials_SNR$is_highest_harmonic_bicluster_ari, 4, 3.5),
+  geom_tile(aes(fill = adjusted.rand_bicluster_true_mean)) +
+  geom_text(aes(label = round(adjusted.rand_bicluster_true_mean, digits = 3),
+                fontface = ifelse(is_highest_true_bicluster_ari, "bold", "plain")),
+            size=ifelse(squash_trials_SNR$is_highest_true_bicluster_ari, 4, 3.5),
             color = "#000") +
-  geom_text(aes(label = paste0("(", round(adjusted.rand_bicluster_harmonic_se, digits = 3), ")")), 
+  geom_text(aes(label = paste0("(", round(adjusted.rand_bicluster_true_se, digits = 3), ")")), 
             nudge_y = -0.30,
             size = 2.5,
             color = "#000") +
-  labs(x = "Number of rows and informative columns", y = "sigma", fill="Harmonic Bicluster ARI") +
+  labs(x = "Number of rows and informative columns", y = "sigma", fill="True Bicluster ARI") +
   scale_fill_viridis_c(breaks=seq(0, 1, 0.2), limits = c(0,1), option = "E") +
   facet_wrap(~algorithm) +
   theme_minimal() +
   theme(legend.position = c(0.9, 0.02),
-      legend.justification = c(1, 0), 
-      legend.text = element_text(size=12),
-      legend.key.height=unit(1,"cm"),
-      strip.text.x = element_text(size = 10, colour = "black"),
-      strip.background = element_rect(fill="#DDD", linewidth = 0))
+        legend.justification = c(1, 0), 
+        legend.text = element_text(size=12),
+        legend.key.height=unit(1,"cm"),
+        strip.text.x = element_text(size = 10, colour = "black"),
+        strip.background = element_rect(fill="#DDD", linewidth = 0))
 
-ggsave("~/BCBC/simulated_experiments/figures/simulation2_harmonic_ari.png",
+ggsave("~/BCBC/simulated_experiments/figures/simulation2_true_ari.png",
        plot=sim2_ari,
        units = "in",
        width = 8,
@@ -293,14 +372,14 @@ ggsave("~/BCBC/simulated_experiments/figures/simulation2_harmonic_ari.png",
 
 ```{r}
 sim2_auc <- ggplot(all_results_SNR |>
-         filter(grepl("BCBC", algorithm)),
+         filter(grepl("BCBC", algorithm) | grepl("SparseBC", algorithm) | grepl("SC-", algorithm)),
        aes(x=factor(noise_level), y=feature_auc, color=algorithm)) +
   geom_boxplot() +
   labs(y = "AUC Score", x = "Noise Level", color = "Algorithm") + 
-  scale_color_brewer(palette = "Paired") +
+  scale_color_manual(values = color_scheme) +
   facet_wrap(~n, labeller = labeller(n = ~ paste0("n=", .x))) +
   theme_minimal() +
-  theme(legend.position = c(0.92, 0.075),
+  theme(legend.position = c(0.92, 0.05),
         legend.justification = c(1, 0), 
         legend.text = element_text(size=12),
         legend.key.height=unit(1,"cm"),
