@@ -98,3 +98,18 @@ or `BCBC/simulated_experiments/run_all_simulations.sh`.
 Real data can be run with `BCBC/real_data_experiments/run_all_experiments.sh`.
 
 The lymphoma experiment can be run with `BCBC/real_data_experiments/lymphoma_experiment.sh`.
+
+## Other methods
+
+To run the simulated experiments, the following packages need to be installed.
+
+```{r}
+install.packages("SCBiclust")
+install.packages("sparseBC")
+install.packages("biclust")
+install.packages("s4vd")
+install.packages("dynamicTreeCut")
+
+# ideally one should download and install from source
+devtools::install_github("yanzhong07/BCEL") 
+```
