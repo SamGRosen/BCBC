@@ -4,6 +4,10 @@ Code for Biconvex Biclustering
 
 ## Installation
 
+```{r}
+devtools::install_github("SamGRosen/BCBC") 
+```
+
 ## Complete Example
 
 We show how to generate some data, do proper tuning according to the paper, and examine the results.
