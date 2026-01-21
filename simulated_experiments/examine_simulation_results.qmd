@@ -142,8 +142,6 @@ plot_methods <- function(metric, label=metric) {
   geom_line(linewidth=1) +
   geom_point(size=2.5) +
   labs(y = label, x = "Extra Noisy Features", color="Algorithm", fill="Algorithm") + 
-  # scale_color_brewer(palette = "Paired") +
-  # scale_fill_brewer(palette = "Paired") +
   scale_fill_manual(values = color_scheme) +
   scale_color_manual(values = color_scheme) +
   scale_x_continuous(breaks = seq(0, 900, 100)) + 
@@ -159,22 +157,8 @@ plot_methods <- function(metric, label=metric) {
 # plot_methods("adjusted.rand_col", "All Column ARI")
 # ggsave("~/BCBC/simulated_experiments/figures/col_ari.png")
 
-# plot_methods("true_err", "Error")
 plot_methods("feature_f1", "F1 Score")
-# plot_methods("feature_recall", "Recall")
-# plot_methods("feature_precision", "Precision")
-# plot_methods("row_silhouette")
-# plot_methods("col_silhouette")
-# plot_methods("adjusted.rand_bicluster", "Bicluster ARI")
-# ggsave("~/BCBC/simulated_experiments/figures/simulation1_bicluster_ari.png")
-
-# plot_methods("adjusted.rand_bicluster_true", "True Bicluster ARI")
 # ggsave("~/BCBC/simulated_experiments/figures/simulation1_true_bicluster_ari.png")
-
-
-# plot_methods("adjusted.rand_bicluster_harmonic", "Harmonic Bicluster ARI")
-# ggsave("~/BCBC/simulated_experiments/figures/simulation1_harmonic_bicluster_ari.png")
-
 ```
 
 ```{r}
@@ -193,10 +177,13 @@ ggplot(squash_trials |> filter(
   scale_fill_manual(values = color_scheme) +
   scale_color_manual(values = color_scheme) +
   scale_x_continuous(breaks = seq(0, 900, 100)) + 
-  # ggtitle("General Comparison of Methods") +
+  ggtitle("Comparison of Biclustering Performance") +
   theme_minimal()
 
-ggsave("~/BCBC/simulated_experiments/figures/simulation1_basic_true_bicluster_ari.png")
+# ggsave("~/BCBC/simulated_experiments/figures/simulation1_basic_true_bicluster_ari.pdf", device = "pdf",
+#        units = "in",
+#        width = 8,
+#        height = 6)
 
 ```
 
@@ -221,8 +208,6 @@ ggplot(squash_trials |> filter(
   ggtitle("Comparison of Strongest Methods with Oracle Information") +
   theme_minimal()
 
-ggsave("~/BCBC/simulated_experiments/figures/simulation1_oracle_true_bicluster_ari.png")
-
 ```
 
 ```{r}
@@ -235,20 +220,76 @@ ggplot(all_results |>
          filter(p > 200),
        aes(x=factor(p - 200), y=feature_auc, color=algorithm)) +
   geom_boxplot(coef = 1.25) +
-  # geom_point() +
   labs(y = "AUC Score", x = "Extra Noisy Features", color="Algorithm") + 
   scale_color_manual(values = color_scheme) +
   ggtitle("AUC of Feature Selection Mechanism") +
-  theme_minimal()
-  # annotate("segment", x = seq(1.5, 9.5, 1), xend = seq(1.5, 9.5, 1), 
-  #          y = 0, yend = 1, 
-  #          color = "black", linewidth = 0.25, linetype="solid") + 
-  #  +
-  # # theme(panel.grid.major.x = element_blank())
+  theme_minimal() +
+  annotate("segment", x = seq(0.5, 9.5, 1), xend = seq(0.5, 9.5, 1),
+           y = 0, yend = 1,
+           color = "grey", linewidth = 0.25, linetype="dashed") +
+  theme(panel.grid.major.x = element_blank())
 
-ggsave("~/BCBC/simulated_experiments/figures/simulation1_auc.png")
+# ggsave("~/BCBC/simulated_experiments/figures/simulation1_auc.pdf", device = "pdf",
+#        units = "in",
+#        width = 9,
+#        height = 5)
 ```
 
+```{r}
+ggplot(all_results |>
+         filter(grepl("BCBC", algorithm) | 
+                  grepl("COBRA", algorithm) | 
+                  grepl("SparseBC", algorithm) | 
+                  grepl("SC-Biclust", algorithm) |
+                  grepl("BCEL", algorithm)) |>
+         filter(p > 200),
+       # aes(x=factor(p - 200), y=feature_auc, color=algorithm)) +
+       aes(x=algorithm, y=feature_auc, color=factor(p, ordered = T))) +
+  geom_boxplot(coef = 1.25, outlier.size = 0.75) +
+  labs(y = "AUC Score", x = "Extra Noisy Features", color="Algorithm") + 
+  # scale_color_manual(values = color_scheme) +
+  scale_color_manual(
+    values = gray.colors(n = 9, start = 0.5, end = 0.05)
+  ) +
+  ggtitle("AUC of Feature Selection Mechanism") +
+  theme_minimal() +
+  annotate("segment", x = seq(0.5, 7.5, 1), xend = seq(0.5, 7.5, 1),
+           y = 0.4, yend = 1,
+           color = "grey", linewidth = 0.25, linetype="dashed") +
+  theme(panel.grid.major.x = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1.25, hjust = 1))
+
+# ggsave("~/BCBC/simulated_experiments/figures/simulation1_auc.pdf", device = "pdf",
+#        units = "in",
+#        width = 9,
+#        height = 5)
+```
+
+```{r}
+ggplot(all_results |>
+         filter(grepl("BCBC", algorithm) | 
+                  grepl("COBRA", algorithm) | 
+                  grepl("SparseBC", algorithm) | 
+                  grepl("SC-Biclust", algorithm) |
+                  grepl("BCEL", algorithm)) |>
+         filter(p > 200),
+       aes(x=factor(p - 200), y=feature_auc, color=algorithm)) +
+  geom_boxplot(coef = 1.25, outlier.size = 0.75) +
+  labs(y = "AUC Score", x = "Extra Noisy Features", color="Algorithm") + 
+  scale_color_manual(values = color_scheme, guide = "none") +
+  ggtitle("AUC of Feature Selection Mechanism") +
+  theme_minimal() +
+  scale_x_discrete(breaks = seq(100, 900, 100),
+                   labels = c(100, "", 300, "", 500, "", 700, "", 900)) + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1.25, vjust = 1.4, size = 7),
+        panel.spacing = unit(c(0.7), "lines")) +
+  facet_wrap(~algorithm, ncol = 7)
+
+ggsave("~/BCBC/simulated_experiments/figures/simulation1_auc.pdf", device = "pdf",
+       units = "in",
+       width = 9,
+       height = 5)
+```
 
 # SNR Experiments
 
@@ -351,10 +392,11 @@ sim2_ari <- ggplot(squash_trials_SNR, aes(x = factor(n), y = factor(noise_level)
             nudge_y = -0.30,
             size = 2.5,
             color = "#000") +
-  labs(x = "Number of rows and informative columns", y = "sigma", fill="True Bicluster ARI") +
+  labs(x = "Number of rows and informative columns", y = "Noise Level", fill="True Bicluster ARI") +
   scale_fill_viridis_c(breaks=seq(0, 1, 0.2), limits = c(0,1), option = "E") +
   facet_wrap(~algorithm) +
   theme_minimal() +
+  ggtitle("Comparison of Methods in High-Noise Regime") +
   theme(legend.position = c(0.9, 0.02),
         legend.justification = c(1, 0), 
         legend.text = element_text(size=12),
@@ -362,35 +404,46 @@ sim2_ari <- ggplot(squash_trials_SNR, aes(x = factor(n), y = factor(noise_level)
         strip.text.x = element_text(size = 10, colour = "black"),
         strip.background = element_rect(fill="#DDD", linewidth = 0))
 
-ggsave("~/BCBC/simulated_experiments/figures/simulation2_true_ari.png",
+ggsave("~/BCBC/simulated_experiments/figures/simulation2_true_ari.pdf",
        plot=sim2_ari,
        units = "in",
-       width = 8,
-       height = 6)
+       width = 9,
+       height = 6,
+       device = "pdf")
 
 ```
 
 ```{r}
-sim2_auc <- ggplot(all_results_SNR |>
-         filter(grepl("BCBC", algorithm) | grepl("SparseBC", algorithm) | grepl("SC-", algorithm)),
-       aes(x=factor(noise_level), y=feature_auc, color=algorithm)) +
+input_df <- all_results_SNR |>
+         filter(grepl("BCBC", algorithm) | grepl("SparseBC", algorithm) | grepl("SC-", algorithm))
+
+sim2_auc = ggplot(input_df,
+       aes(x=factor(n), y=feature_auc, color=algorithm)) +
+       # aes(x=algorithm, y=feature_auc, color=algorithm, group = factor(paste(noise_level, algorithm)))) +
   geom_boxplot() +
-  labs(y = "AUC Score", x = "Noise Level", color = "Algorithm") + 
+  labs(y = "AUC Score", x = "Number of rows and informative columns", color = "Algorithm") + 
   scale_color_manual(values = color_scheme) +
-  facet_wrap(~n, labeller = labeller(n = ~ paste0("n=", .x))) +
+  # facet_wrap(~noise_level_label, labeller = label_tex) +
+  facet_wrap(~noise_level, labeller = labeller(noise_level = ~ paste0("Noise Level=", .x))) +
+  ggtitle("AUC of Feature Selection Mechanism") +
   theme_minimal() +
-  theme(legend.position = c(0.92, 0.05),
+  theme(legend.position = c(0.92, 0.0),
         legend.justification = c(1, 0), 
         legend.text = element_text(size=12),
         legend.key.height=unit(1,"cm"),
         strip.text.x = element_text(size = 10, colour = "black"),
-        strip.background = element_rect(fill="#DDD", linewidth = 0))
+        strip.background = element_rect(fill="#DDD", linewidth = 0),
+        panel.grid.major.x = element_blank()) +
+  annotate("segment", x = seq(0.5, 5.5, 1), xend = seq(0.5, 5.5, 1),
+           y = 0, yend = 1,
+           color = "grey", linewidth = 0.25, linetype="dashed")
 
-ggsave("~/BCBC/simulated_experiments/figures/simulation2_auc.png",
+ggsave("~/BCBC/simulated_experiments/figures/simulation2_auc.pdf",
        plot=sim2_auc,
        units = "in",
        width = 8,
-       height = 6)
+       height = 6,
+       device = "pdf")
 
 
 ```

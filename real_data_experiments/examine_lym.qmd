@@ -1,4 +1,6 @@
 ```{r}
+library(ggdendro)
+
 lym = read.csv("./data/lymphoma_labelled.txt", header = TRUE, sep = ",")
 X <- t(lym)
 labels = case_when(grepl("DLCL", colnames(lym)) ~ 1,
@@ -9,7 +11,7 @@ gene_names = read.csv("~/figure1.cdt.txt", header = TRUE, sep = "\t")
 ```
 
 ```{r}
-bcbc_obj <- readRDS("/cwork/sgr26/BCBC_ADAPTIVE_lym2_25964044.RDS")
+bcbc_obj <- readRDS("/cwork/sgr26/BCBC_ADAPTIVE_lymphoma_labelled_34528569.RDS")
 
 ```
 
@@ -26,7 +28,6 @@ fit <- bcbc_obj$lambda_cv$all_runs[[best_lambda_index]]
 
 
 plot(sort(fit$w))
-plot_fit(bcbc_result_to_df(fit, labels = labels), weight_annotation = T)
 # plot_fit(bcbc_result_to_df(fit, filter_weight = 0, labels = labels))
 plot_fit(bcbc_result_to_df(fit, filter_weight = 0, labels = labels), bin_scale = 10)
 plot_fit(bcbc_result_to_df(fit, filter_weight = 3e-4, labels = labels))
@@ -144,6 +145,7 @@ label_annotation <- annotate(
   )
 )
 
+# raster <- geom_tile(aes(fill = .data[[fill_attr]]), color = NA)
 raster <- geom_raster(aes(fill = .data[[fill_attr]]))
 if (!bin_scale) {
   plot_scale = scale_fill_gradient2()
@@ -151,28 +153,40 @@ if (!bin_scale) {
   plot_scale = scale_fill_steps2(n.breaks = bin_scale)
 }
 
+cluster_lefts <- c(min(top_cluster_cols1$order_col), min(top_cluster_cols2$order_col),
+           min(top_cluster_cols3$order_col), min(top_cluster_cols4$order_col),
+           min(top_cluster_cols5$order_col), min(top_cluster_cols6$order_col),
+           min(top_cluster_cols7$order_col), min(top_cluster_cols8$order_col),
+           min(top_cluster_cols9$order_col), min(top_cluster_cols10$order_col))
+cluster_rights <- c(max(top_cluster_cols1$order_col), max(top_cluster_cols2$order_col),
+           max(top_cluster_cols3$order_col), max(top_cluster_cols4$order_col),
+           max(top_cluster_cols5$order_col), max(top_cluster_cols6$order_col),
+           max(top_cluster_cols7$order_col), max(top_cluster_cols8$order_col),
+           max(top_cluster_cols9$order_col), max(top_cluster_cols10$order_col))
+
 bicluster_annotation = annotate(
   "rect",
-  xmin = c(min(top_cluster_cols6$order_col), min(top_cluster_cols5$order_col),
-           min(top_cluster_cols4$order_col), min(top_cluster_cols3$order_col),
-           min(top_cluster_cols2$order_col), min(top_cluster_cols1$order_col), # combining 1 and 2 since split
-           min(top_cluster_cols7$order_col), min(top_cluster_cols8$order_col),
-           min(top_cluster_cols9$order_col), min(top_cluster_cols10$order_col)),
-  xmax = c(max(top_cluster_cols6$order_col), max(top_cluster_cols5$order_col),
-           max(top_cluster_cols4$order_col), max(top_cluster_cols3$order_col),
-           max(top_cluster_cols2$order_col), max(top_cluster_cols1$order_col),
-           max(top_cluster_cols7$order_col), max(top_cluster_cols8$order_col),
-           max(top_cluster_cols9$order_col), max(top_cluster_cols10$order_col)),
+  xmin = cluster_lefts,
+  xmax = cluster_rights,
   ymin = 0.5,
   ymax = 62.5,
   fill = NA,
-  color = "black", # scale_fill_gradient2(low="#FFC300", high="#581845")$palette(seq(0, 1, length.out = 10)),
+  color = "black",
   linewidth = 0.5,
   linetype = "twodash"
 )
 
+text_annotation = annotate(
+  "text",
+  x = (cluster_lefts + cluster_rights) / 2,
+  y = -5,
+  label = c("A", "B", "C", "D", "E", "F", "G", "H","I", "J"),
+  color = "black"
+)
+
 y_start = max(plot_df$order_row) + 1
 
+# Verify rectangles are correct sizes
 max(top_cluster_cols1$order_col) - min(top_cluster_cols1$order_col) - length(unique(top_cluster_cols1$order_col))
 max(top_cluster_cols2$order_col) - min(top_cluster_cols2$order_col) - length(unique(top_cluster_cols2$order_col))
 max(top_cluster_cols3$order_col) - min(top_cluster_cols3$order_col) - length(unique(top_cluster_cols3$order_col))
@@ -195,18 +209,30 @@ ggplot(plot_df, aes(x = order_col, y = order_row)) +
                aes(x = x, y = y_start + y / max(y) * 20, xend = xend, yend = y_start + yend / max(yend) * 20)
   ) +
   bicluster_annotation +
+  scale_x_continuous(breaks = (cluster_lefts + cluster_rights) / 2,
+                     labels = c("A", "B", "C", "D", "E", "F", "G", "H","I", "J")) +
   theme_minimal() +
   theme(
-    axis.text.x = element_blank(),
-    axis.ticks.x = element_blank(),
+    axis.text.x = element_text(color = "black", size = 10, face = "bold",
+                               margin = margin(t = 1), family = "Times"),
+    axis.ticks.x = element_line(color = "black", size = 1),
+    axis.ticks.length = unit(0.25, "cm"),
     axis.text.y = element_blank(),
     axis.ticks.y = element_blank(),
     plot.title = element_text(size=20)
   ) +
+  coord_cartesian(ylim=c(4, 84)) +
   guides(fill = "none") +
   xlab("mRNA Sample") +
   ylab("cDNA Clone") +
   ggtitle("Lymphoma Biclustering")
+
+ggsave("~/BCBC/real_data_experiments/lymphoma.pdf",
+       units = "in",
+       width = 8,
+       height = 4,
+       device = "pdf",
+       dpi = 900)
 ```
 
 ```{r}

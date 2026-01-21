@@ -1,6 +1,6 @@
-sbatch --export=ALL,METHOD='BCBC_ADAPTIVE' lym2_experiment.sh
-sbatch --export=ALL,METHOD='BCBC_ADAPT_APPROX' lym2_experiment.sh
-sbatch --export=ALL,METHOD='BCBC' lym2_experiment.sh
+sbatch --export=ALL,METHOD='BCBC_ADAPTIVE' lymphoma_experiment.sh
+sbatch --export=ALL,METHOD='BCBC_ADAPT_APPROX' lymphoma_experiment.sh
+sbatch --export=ALL,METHOD='BCBC' lymphoma_experiment.sh
 
 sbatch --export=ALL,METHOD='BCBC_ADAPTIVE',DATASET='srbct' data_experiment.sh
 sbatch --export=ALL,METHOD='BCBC_ADAPTIVE',DATASET='brain' data_experiment.sh
