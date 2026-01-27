@@ -7,10 +7,10 @@
 knn_graph_approx(
   X,
   k,
-  rescale = FALSE,
+  sum_to_one = TRUE,
+  rescale_by_dim = ncol(X),
   uniform = FALSE,
-  phi = 1,
-  byrow = FALSE,
+  phi = 1/ncol(X),
   hnsw_args = list()
 )
 }
@@ -19,23 +19,22 @@ knn_graph_approx(
 
 \item{k}{number of nearest neighbors}
 
-\item{rescale}{weights and bandwidth by this factor}
+\item{sum_to_one}{make weights sum to one before any dimension rescaling}
+
+\item{rescale_by_dim}{rescale weights by dividing by sqrt(this number) (if finite)}
 
 \item{uniform}{treat all edges as equal magnitude}
 
 \item{phi}{bandwidth for Gaussian kernel}
 
-\item{byrow}{calculate for rows instead of columns}
-
 \item{hnsw_args}{passed to \code{RcppHNSW::hnsw_knn}}
 }
 \value{
-list with
+\code{sparseweights} object (list) with
 \enumerate{
-\item \code{weights} vector of edge weights
-\item \code{E_row} sparse unweighted edge incidence matrix
+\item \code{keys} matrix of edges
+\item \code{values} weights for edges in \code{keys}
 \item \code{fusion} sum of fusion term when using the weights and distances
-\item \code{unique_edges} data frame describing edge information
 }
 }
 \description{

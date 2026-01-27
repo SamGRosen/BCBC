@@ -9,25 +9,25 @@ cobra_knn(
   gamma,
   k_samples = 2,
   k_features = 2,
-  phi = 1,
   max_iter = 250,
+  max_iter_inner = 250,
   tol = 1e-04
 )
 }
 \arguments{
 \item{X}{data matrix}
 
-\item{gamma}{fusion hyperparameter}
+\item{gamma}{regularization parameter}
 
 \item{k_samples}{number of nearest neighbors for sample affinity graph}
 
 \item{k_features}{number of nearest neighbors for feature affinity graph}
 
-\item{phi}{bandwidth parameter}
+\item{max_iter}{number of convex cluster optimizations to solve}
 
-\item{max_iter}{of COBRA}
+\item{max_iter_inner}{number of inner iterations for \code{CCMMR}}
 
-\item{tol}{for termination}
+\item{tol}{of convergence}
 }
 \value{
 fitted bicluster matrix
@@ -41,4 +41,8 @@ cobra_knn(checker$X, 200, 4, 4)
 }
 \seealso{
 \code{\link[=fast_gkn_weights]{fast_gkn_weights()}}
+
+\code{\link[=knn_graph]{knn_graph()}}
+
+\code{\link[=knn_graph_approx]{knn_graph_approx()}}
 }

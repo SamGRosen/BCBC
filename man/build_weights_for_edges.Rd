@@ -7,29 +7,31 @@
 build_weights_for_edges(
   edges,
   distances,
+  sum_to_one = TRUE,
+  rescale_by_dim = NA,
   uniform = FALSE,
-  rescale = 1,
   phi = 1
 )
 }
 \arguments{
-\item{edges}{data frame describing}
+\item{edges}{id attribute matrix output from \code{dbscan::kNN} or (idx) \code{RcppHNSW::hnsw_knn}}
 
-\item{distances}{corresponding to each edge}
+\item{distances}{dist attribute output from \code{dbscan::kNN} or \code{RcppHNSW::hnsw_knn}}
+
+\item{sum_to_one}{make weights sum to one before any dimension rescaling}
+
+\item{rescale_by_dim}{rescale weights by dividing by sqrt(this number) (if finite)}
 
 \item{uniform}{treat all edges as equal magnitude}
-
-\item{rescale}{weights and bandwidth by this factor}
 
 \item{phi}{bandwidth for Gaussian kernel}
 }
 \value{
-list with
+\code{sparseweights} object (list) with
 \enumerate{
-\item \code{weights} vector of edge weights
-\item \code{E_row} sparse unweighted edge incidence matrix
+\item \code{keys} matrix of edges
+\item \code{values} weights for edges in \code{keys}
 \item \code{fusion} sum of fusion term when using the weights and distances
-\item \code{unique_edges} data frame describing edge information
 }
 }
 \description{

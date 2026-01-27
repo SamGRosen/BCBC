@@ -4,12 +4,10 @@
 \alias{calc_fusion_term}
 \title{Calculate the fusion term in the BCBC objective function}
 \usage{
-calc_fusion_term(edges, affinities, U, rows = TRUE)
+calc_fusion_term(edges, U, rows = TRUE)
 }
 \arguments{
-\item{edges}{output of affinity calculating function}
-
-\item{affinities}{output of affinity calculating function}
+\item{edges}{\code{sparseweights} object}
 
 \item{U}{input to fusion function}
 
@@ -28,10 +26,12 @@ checker <- gen_checkerboard(n = 100,
                             num_col_clusters = 5,
                             p_extra = 25,
                             shuffle = FALSE)
-fusion_wts <- fast_gkn_weights(t(checker$X), k_row = 4, k_col = 4, phi = 1)
-calc_fusion_term(fusion_wts$unique_row_edges, fusion_wts$w_row, checker$X, rows=FALSE)
-calc_fusion_term(fusion_wts$unique_col_edges, fusion_wts$w_col, checker$X, rows=TRUE)
+fusion_wts <- fast_gkn_weights(checker$X, k_row = 4, k_col = 4)
+calc_fusion_term(fusion_wts$W_row, checker$X, rows=FALSE)
+calc_fusion_term(fusion_wts$W_col, checker$X, rows=TRUE)
 }
 \seealso{
 \code{\link[=fast_gkn_edges]{fast_gkn_edges()}} for Gaussian k-nearest neighbor affinities
+
+\code{\link[=knn_graph]{knn_graph()}} for Gaussian k-nearest neighbor affinities
 }

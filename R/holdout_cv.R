@@ -7,7 +7,6 @@
 #' @param gammas passed to `BCBC_missing`
 #' @param k_samples passed to `BCBC_missing`
 #' @param k_features passed to `BCBC_missing`
-#' @param phis passed to `BCBC_missing`
 #' @param recalculate_weights passed to `BCBC_missing`
 #' @param approx_neighbors passed to `BCBC_missing`
 #' @param hnsw_args passed to `BCBC_missing`
@@ -44,7 +43,6 @@ cv.BCBC_holdout <- function(X,
                             gammas = c(1),
                             k_samples = c(2),
                             k_features = c(2),
-                            phis = c(0.5),
                             recalculate_weights = c(FALSE),
                             approx_neighbors = c(FALSE),
                             hnsw_args = list(),
@@ -58,7 +56,6 @@ cv.BCBC_holdout <- function(X,
       k_samples = k_samples,
       k_features = k_features,
       gamma = gammas,
-      phi = phis,
       recalculate_weights = recalculate_weights,
       approx_neighbors = approx_neighbors,
       tol = tols
@@ -79,10 +76,9 @@ cv.BCBC_holdout <- function(X,
 
     # Use non-missing weights for CV
     wts <- fast_gkn_weights(
-      t(X),
+      X,
       k_row = params$k_features,
       k_col = params$k_samples,
-      phi = params$phi,
       approximate = params$approx_neighbors,
       hnsw_args = hnsw_args
     )

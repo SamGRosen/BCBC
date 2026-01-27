@@ -1,23 +1,3 @@
-#' Method to easily use `igraph::compare`
-#'
-#' @param estimated_clusters community memberships
-#' @param true_clusters community memberships
-#' @param method passed to `igraph::compare`
-#'
-#' @return metric in community memberships
-#' @export
-#' @importFrom igraph compare
-#' @seealso [igraph::compare()]
-safe_compare <- function(estimated_clusters, true_clusters, method) {
-  if (length(estimated_clusters) != length(true_clusters) ||
-      length(unique(estimated_clusters)) == length(true_clusters)) {
-    return(-1)
-  } else {
-    return(igraph::compare(estimated_clusters, true_clusters, method = method))
-  }
-}
-
-
 #' Convert a matrix into a dataframe for post-processing or plotting.
 #'
 #' @param matrix to convert

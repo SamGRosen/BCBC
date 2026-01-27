@@ -4,25 +4,27 @@
 \alias{full_connectivity}
 \title{Build completely connected affinity graph}
 \usage{
-full_connectivity(X, rescale = NA, uniform = FALSE, phi = 1)
+full_connectivity(
+  X,
+  sum_to_one = TRUE,
+  rescale_by_dim = TRUE,
+  uniform = FALSE,
+  phi = 1/ncol(X)
+)
 }
 \arguments{
 \item{X}{data matrix}
 
-\item{rescale}{weights and bandwidth by this factor}
+\item{sum_to_one}{sum the weights to one}
 
-\item{uniform}{treat all edges as equal magnitude}
+\item{rescale_by_dim}{divide the weights by sqrt(ncol(X))}
 
-\item{phi}{bandwidth for Gaussian kernel}
+\item{uniform}{keep all weights uniform}
+
+\item{phi}{exponential kernel scaling}
 }
 \value{
-list with
-\enumerate{
-\item \code{weights} vector of edge weights
-\item \code{E_row} sparse unweighted edge incidence matrix
-\item \code{fusion} sum of fusion term when using the weights and distances
-\item \code{unique_edges} data frame describing edge information
-}
+sparseweights object
 }
 \description{
 Build completely connected affinity graph

@@ -135,7 +135,6 @@ get_all_cv_metrics <- function(X,
 #' @param tmaxs inputs to `BCBC`
 #' @param tmax_outers inputs to `BCBC`
 #' @param tmax_cobras inputs to `BCBC`
-#' @param phis inputs to `BCBC`
 #' @param recalculate_weights inputs to `BCBC`
 #' @param tols inputs to `BCBC`
 #' @param percent_noise input to `get_cv_metrics`
@@ -177,7 +176,6 @@ cv.BCBC <- function(X,
                     tmaxs = c(NA),
                     tmax_outers = c(100),
                     tmax_cobras = c(100),
-                    phis = c(0.5),
                     recalculate_weights = c(TRUE),
                     tols = c(1e-6),
                     percent_noise = c(0.25),
@@ -196,7 +194,6 @@ cv.BCBC <- function(X,
       tmax = tmaxs,
       tmax_outer = tmax_outers,
       tmax_cobra = tmax_cobras,
-      phi = phis,
       recalculate_weights = recalculate_weights,
       approx_neighbors = approx_neighbors,
       tol = tols

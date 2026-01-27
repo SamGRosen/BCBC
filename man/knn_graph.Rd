@@ -4,26 +4,34 @@
 \alias{knn_graph}
 \title{Calculate exact nearest neighbors for use with \code{BCBC}, \code{cobra} and subroutines.}
 \usage{
-knn_graph(X, k, rescale = FALSE, uniform = FALSE, phi = 1)
+knn_graph(
+  X,
+  k,
+  sum_to_one = TRUE,
+  rescale_by_dim = ncol(X),
+  uniform = FALSE,
+  phi = 1/ncol(X)
+)
 }
 \arguments{
 \item{X}{data matrix}
 
 \item{k}{number of nearnest neighbors}
 
-\item{rescale}{weights and bandwidth by this factor}
+\item{sum_to_one}{make weights sum to one before any dimension rescaling}
+
+\item{rescale_by_dim}{rescale weights by dividing by sqrt(this number) (if finite)}
 
 \item{uniform}{treat all edges as equal magnitude}
 
 \item{phi}{bandwidth for Gaussian kernel}
 }
 \value{
-list with
+\code{sparseweights} object (list) with
 \enumerate{
-\item \code{weights} vector of edge weights
-\item \code{E_row} sparse unweighted edge incidence matrix
+\item \code{keys} matrix of edges
+\item \code{values} weights for edges in \code{keys}
 \item \code{fusion} sum of fusion term when using the weights and distances
-\item \code{unique_edges} data frame describing edge information
 }
 }
 \description{

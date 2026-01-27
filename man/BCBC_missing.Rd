@@ -10,7 +10,6 @@ BCBC_missing(
   k_samples = 4,
   k_features = 4,
   gamma = 10,
-  phi = 1,
   tmax_hierarchy = c(10, 25, 50),
   tol = 1e-04,
   recalculate_weights = FALSE,
@@ -31,8 +30,6 @@ BCBC_missing(
 \item{k_features}{number of nearest neighbors used to calculate feature affinity graph}
 
 \item{gamma}{fusion hyperparameter}
-
-\item{phi}{bandwidth of affinity graph kernel}
 
 \item{tmax_hierarchy}{vector of 3 values
 \enumerate{

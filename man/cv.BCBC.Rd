@@ -13,7 +13,6 @@ cv.BCBC(
   tmaxs = c(NA),
   tmax_outers = c(100),
   tmax_cobras = c(100),
-  phis = c(0.5),
   recalculate_weights = c(TRUE),
   tols = c(1e-06),
   percent_noise = c(0.25),
@@ -40,8 +39,6 @@ cv.BCBC(
 \item{tmax_outers}{inputs to \code{BCBC}}
 
 \item{tmax_cobras}{inputs to \code{BCBC}}
-
-\item{phis}{inputs to \code{BCBC}}
 
 \item{recalculate_weights}{inputs to \code{BCBC}}
 

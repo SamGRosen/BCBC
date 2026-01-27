@@ -1,30 +1,16 @@
-create_edge_incidence_edges <- function(P, n) {
-  nEdges <- nrow(P)
-  E <- Matrix(
-    data = 0,
-    nrow = nEdges,
-    ncol = n,
-    sparse = TRUE
-  )
-  r <- 1:nEdges
-  col <- P[, 1]
-  E[(col - 1) * nEdges + r] <- 1
-  col <- P[, 2]
-  E[(col - 1) * nEdges + r] <- -1
-  return(E)
-}
-
-#' Build row and column info for usage with `BCBC`, `cobra` and subroutines.
+#' Build row and column info for usage with `BCBC`, `cobra` and subroutines
+#' using specification from paper. Use `knn_graph` or `knn_graph_approx` for
+#' more precise control.
 #'
 #' @param X data matrix
 #' @param k_row number of nearest neighbors for rows
 #' @param k_col number of nearest neighbors for columns
 #' @param approximate use RcppHNSW for calculation
-#' @param hnsw_args passed to `RcppHNSW::hnsw_knn`
-#' @inheritParams build_weights_for_edges
+#' @param hnsw_args passed to `RcppHNSW::hnsw_knn` if `approximate` is true
 #' @seealso [knn_graph()]
 #' @seealso [knn_graph_approx()]
-#' @return list of row and column info similar to `knn_graph` return info
+#' @return list of row and column info similar to `knn_graph` return info under
+#' `W_row` and `W_col` keys.
 #' @export
 #'
 #' @examples
@@ -34,32 +20,56 @@ create_edge_incidence_edges <- function(P, n) {
 #'                             num_col_clusters = 5,
 #'                             p_extra = 25,
 #'                             shuffle = FALSE)
-#' fusion_wts <- fast_gkn_weights(t(checker$X), k_row = 4, k_col = 4, phi = 1)
+#' fusion_wts <- fast_gkn_weights(t(checker$X), k_row = 4, k_col = 4)
 #' calc_fusion_term(fusion_wts$unique_row_edges, fusion_wts$w_row, checker$X, rows=FALSE)
 #' calc_fusion_term(fusion_wts$unique_col_edges, fusion_wts$w_col, checker$X, rows=TRUE)
-fast_gkn_weights <- function(X, k_row, k_col, phi,
+fast_gkn_weights <- function(X,
+                             k_row,
+                             k_col,
                              approximate = FALSE,
-                             rescale = TRUE,
-                             uniform = FALSE,
                              hnsw_args = list(ef = 50)) {
-  if(approximate) {
-    row_knn <- knn_graph_approx(X, k_row, rescale, uniform, phi, hnsw_args, byrow = TRUE)
-    col_knn <- knn_graph_approx(X, k_row, rescale, uniform, phi, hnsw_args, byrow = FALSE)
+  if (approximate) {
+    row_knn <- knn_graph_approx(
+      X,
+      k_row,
+      sum_to_one = TRUE,
+      rescale_by_dim = ncol(X),
+      uniform = FALSE,
+      phi = 1 / ncol(X),
+      hnsw_args = hnsw_args
+    )
+    col_knn <- knn_graph_approx(
+      t(X),
+      k_col,
+      sum_to_one = TRUE,
+      rescale_by_dim = nrow(X),
+      uniform = FALSE,
+      phi = 1 / nrow(X),
+      hnsw_args = hnsw_args
+    )
   } else {
-    row_knn <- knn_graph(X, k_row, rescale, uniform, phi)
-    col_knn <- knn_graph(t(X), k_col, rescale, uniform, phi)
+    row_knn <- knn_graph(
+      X,
+      k_row,
+      sum_to_one = TRUE,
+      rescale_by_dim = ncol(X),
+      uniform = FALSE,
+      phi = 1 / ncol(X)
+    )
+    col_knn <- knn_graph(
+      t(X),
+      k_col,
+      sum_to_one = TRUE,
+      rescale_by_dim = nrow(X),
+      uniform = FALSE,
+      phi = 1 / nrow(X)
+    )
   }
-  list(
-    w_row = row_knn$weights,
-    w_col = col_knn$weights,
-    E_row = row_knn$E_row,
-    E_col = col_knn$E_row,
-    row_fusion = row_knn$fusion,
-    col_fusion = col_knn$fusion,
-    unique_row_edges = row_knn$unique_edges,
-    unique_col_edges = col_knn$unique_edges
-  )
 
+  list(
+    W_row = row_knn,
+    W_col = col_knn
+  )
 }
 
 #' Calculate exact nearest neighbors for use with `BCBC`, `cobra` and subroutines.
@@ -74,18 +84,18 @@ fast_gkn_weights <- function(X, k_row, k_col, phi,
 #'
 knn_graph <- function(X,
                       k,
-                      rescale = FALSE,
+                      sum_to_one = TRUE,
+                      rescale_by_dim = ncol(X),
                       uniform = FALSE,
-                      phi = 1) {
-  all_row_knn <- kNN(X, k, sort = FALSE)
-  if (is.finite(rescale) && rescale > 0) {
-    rescale <- ncol(X)
-  }
+                      phi = 1 / ncol(X)) {
+  all_row_knn <- dbscan::kNN(X, k, sort = FALSE)
+
   build_weights_for_edges(
     all_row_knn$id,
     all_row_knn$dist,
+    sum_to_one = sum_to_one,
+    rescale_by_dim = rescale_by_dim,
     uniform = uniform,
-    rescale = rescale,
     phi = phi
   )
 }
@@ -95,7 +105,6 @@ knn_graph <- function(X,
 #'
 #' @param X data matrix
 #' @param k number of nearest neighbors
-#' @param byrow calculate for rows instead of columns
 #' @param hnsw_args passed to `RcppHNSW::hnsw_knn`
 #' @inheritParams build_weights_for_edges
 #' @inherit build_weights_for_edges return
@@ -104,72 +113,21 @@ knn_graph <- function(X,
 #'
 knn_graph_approx <- function(X,
                              k,
-                             rescale = FALSE,
+                             sum_to_one = TRUE,
+                             rescale_by_dim = ncol(X),
                              uniform = FALSE,
-                             phi = 1,
-                             byrow = FALSE,
+                             phi = 1 / ncol(X),
                              hnsw_args = list()) {
+  knn_results <- do.call(hnsw_knn, c(list(
+    X = X, k = k + 1, byrow = TRUE  # k + 1 to avoid counting self-loops
+  ), hnsw_args))
 
-  if(byrow) {
-    knn_results <- do.call(hnsw_knn, c(list(
-      X = t(X), k = k + 1, byrow = FALSE  # k + 1 to avoid counting self-loops
-    ), hnsw_args))
-  } else {
-    knn_results <- do.call(hnsw_knn, c(list(
-      X = X, k = k + 1, byrow = FALSE
-    ), hnsw_args))
-  }
-
-  if (is.finite(rescale) && rescale > 0) {
-    if(byrow) {
-      rescale <- ncol(X)
-    } else {
-      rescale <- nrow(X)
-    }
-  }
   build_weights_for_edges(
-    t(knn_results$idx),
-    t(knn_results$dist),
+    knn_results$idx,
+    knn_results$dist,
+    sum_to_one = sum_to_one,
+    rescale_by_dim = rescale_by_dim,
     uniform = uniform,
-    rescale = rescale,
-    phi = phi
-  )
-}
-
-#' Find geometric mediod and build star affinity graph
-#'
-#' @param X data matrix
-#' @inheritParams build_weights_for_edges
-#' @inherit build_weights_for_edges return
-#'
-#' @export
-#'
-geometric_medoid <- function(X,
-                             rescale = FALSE,
-                             uniform = FALSE,
-                             phi = 1) {
-  n <- nrow(X)
-  p <- ncol(X)
-
-  all_dist <- as.matrix(dist(X))
-  medoid_index <- which.min(rowSums(all_dist))
-
-  # Add duplicate edges as they are removed anyways
-  all_edges <- matrix(medoid_index, nrow = n, ncol = n - 1)
-  all_edges[medoid_index, ] <- (1:n)[-medoid_index]
-
-  # Set to have duplicate distances, except at medoid
-  all_dist_medoid <- matrix(all_dist[medoid_index,], nrow=n, ncol=n - 1)
-  all_dist_medoid[medoid_index, ] <- all_dist[medoid_index, -medoid_index]
-
-  if (is.finite(rescale) && rescale > 0) {
-    rescale <- p
-  }
-  build_weights_for_edges(
-    all_edges,
-    all_dist_medoid,
-    uniform = uniform,
-    rescale = rescale,
     phi = phi
   )
 }
@@ -178,104 +136,109 @@ geometric_medoid <- function(X,
 #' Build completely connected affinity graph
 #'
 #' @param X data matrix
-#' @inheritParams build_weights_for_edges
-#' @inherit build_weights_for_edges return
+#' @param sum_to_one sum the weights to one
+#' @param rescale_by_dim divide the weights by sqrt(ncol(X))
+#' @param uniform keep all weights uniform
+#' @param phi exponential kernel scaling
+#'
+#' @return sparseweights object
 #' @export
 #'
 full_connectivity <- function(X,
-                              rescale = NA,
+                              sum_to_one = TRUE,
+                              rescale_by_dim = TRUE,
                               uniform = FALSE,
-                              phi = 1) {
+                              phi = 1 / ncol(X)) {
   n <- nrow(X)
   p <- ncol(X)
 
-  all_edges <- matrix(1:nrow(X),
-                      nrow = n,
-                      ncol = n,
-                      byrow = TRUE)
-  all_dist <- as.matrix(dist(X))
+  # Left column should be greater than right for CCMMR
+  all_edges <- t(combn(n:1, 2))
+  all_dist <- c(dist(X))
 
-  # Remove loops https://stackoverflow.com/a/18879755
-  diag(all_edges) <- NA
-  all_edges <- t(matrix(t(all_edges)[which(!is.na(all_edges))],
-                        nrow = n - 1, ncol = n))
+  weights <- distances_to_weights(all_dist,
+                                  sum_to_one = sum_to_one,
+                                  rescale_by_dim = p,
+                                  uniform = uniform,
+                                  phi = phi)
 
-  diag(all_dist) <- NA
-  all_dist <- t(matrix(t(all_dist)[which(!is.na(all_dist))],
-                       nrow = n - 1, ncol = n))
-
-
-  if (is.finite(rescale) && rescale > 0) {
-    rescale <- p
-  }
-  build_weights_for_edges(
-    all_edges,
-    all_dist,
-    uniform = uniform,
-    rescale = rescale,
-    phi = phi
+  structure(
+    list(values = weights, keys = all_edges),
+    class = "sparseweights"
   )
 }
 
 #' Build list for usage with `cobra`.
 #'
-#' @param edges data frame describing
-#' @param distances corresponding to each edge
+#' @param edges id attribute matrix output from `dbscan::kNN` or (idx) `RcppHNSW::hnsw_knn`
+#' @param distances dist attribute output from `dbscan::kNN` or `RcppHNSW::hnsw_knn`
 #' @param uniform treat all edges as equal magnitude
-#' @param rescale weights and bandwidth by this factor
+#' @param rescale_by_dim rescale weights by dividing by sqrt(this number) (if finite)
 #' @param phi bandwidth for Gaussian kernel
+#' @param sum_to_one make weights sum to one before any dimension rescaling
 #'
-#' @return list with
-#'   1. `weights` vector of edge weights
-#'   1. `E_row` sparse unweighted edge incidence matrix
+#' @return `sparseweights` object (list) with
+#'   1. `keys` matrix of edges
+#'   1. `values` weights for edges in `keys`
 #'   1. `fusion` sum of fusion term when using the weights and distances
-#'   1. `unique_edges` data frame describing edge information
 #' @export
 build_weights_for_edges <- function(edges,
                                     distances,
+                                    sum_to_one = TRUE,
+                                    rescale_by_dim = NA,
                                     uniform = FALSE,
-                                    rescale = 1,
                                     phi = 1) {
   unique_edges <- data.frame(edges) |>
-    mutate(index = row_number()) |>
-    pivot_longer(!index) |>
+    mutate(point_index = row_number()) |>
+    pivot_longer(!point_index, names_to = "kth_neighbor", values_to = "neighbor_index") |>
     mutate(
-      neighbor_index = as.integer(sub("X", "", name)),
-      from_node = pmin(index, value),
-      to_node = pmax(index, value)
+      kth_neighbor = as.integer(substring(kth_neighbor, 2)),
+      from_node = pmax(point_index, neighbor_index),
+      to_node = pmin(point_index, neighbor_index)
     ) |>
     filter(from_node != to_node) |>  # Remove self loops
     distinct(from_node, to_node, .keep_all = TRUE)
 
-  all_row_dist_sq <- distances[cbind(unique_edges$from_node,
-                                     unique_edges$neighbor_index)]^2
-  if (!uniform) {
-    if (is.finite(rescale) && rescale > 1) {
-      phi <- phi / rescale
-    }
-    weights <- exp(-all_row_dist_sq * phi)
-  } else {
-    weights <- rep(1, nrow(unique_edges))
-  }
+  all_row_dist <- distances[cbind(unique_edges$from_node,
+                                     unique_edges$kth_neighbor)]
 
-  if(is.finite(rescale) && rescale > 0) {
-    weights <- weights / sum(weights) / sqrt(rescale)
-  }
+  keys = matrix(c(unique_edges$from_node, unique_edges$to_node),
+                nrow = nrow(unique_edges), ncol = 2)
 
-  fusion <- sum(weights * sqrt(distances[cbind(unique_edges$from_node,
-                                               unique_edges$neighbor_index)]^2))
-
-  # Construct edge-incidence matrices
-  E_row <-
-    create_edge_incidence_edges(
-      cbind(unique_edges$from_node, unique_edges$to_node),
-      max(unique_edges$from_node, unique_edges$to_node)
-    )
-
-  list(
-    weights = weights,
-    E_row = E_row,
-    fusion = fusion,
-    unique_edges = unique_edges
+  weights = distances_to_weights(
+    all_row_dist,
+    sum_to_one = sum_to_one,
+    rescale_by_dim = rescale_by_dim,
+    uniform = uniform,
+    phi = phi
   )
+
+  fusion <- sum(weights * all_row_dist)
+
+  structure(
+    list(values = weights, keys = keys, fusion = fusion),
+    class = "sparseweights"
+  )
+}
+
+distances_to_weights <- function(distances,
+                                 sum_to_one = TRUE,
+                                 rescale_by_dim = NA,
+                                 uniform = FALSE,
+                                 phi = 1) {
+  if(!uniform) {
+    weights <- exp(-phi * distances^2)
+  } else {
+    weights <- rep(1, length(distances))
+  }
+
+  if(sum_to_one) {
+    weights <- weights / sum(weights)
+  }
+
+  if(is.finite(rescale_by_dim) && rescale_by_dim >= 1) {
+    weights <- weights / sqrt(rescale_by_dim)
+  }
+
+  weights
 }
