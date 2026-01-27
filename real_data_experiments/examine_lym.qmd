@@ -7,12 +7,11 @@ labels = case_when(grepl("DLCL", colnames(lym)) ~ 1,
                    grepl("FL", colnames(lym)) ~ 2,
                    grepl("CLL", colnames(lym)) ~ 3)
 
-gene_names = read.csv("~/figure1.cdt.txt", header = TRUE, sep = "\t")
+gene_names = read.csv("./data/figure1.cdt.txt", header = TRUE, sep = "\t")
 ```
 
 ```{r}
-bcbc_obj <- readRDS("/cwork/sgr26/BCBC_ADAPTIVE_lymphoma_labelled_34528569.RDS")
-
+bcbc_obj <- readRDS("/cwork/sgr26/BCBC_ADAPTIVE_lymphoma_labelled_42459834.RDS")
 ```
 
 ```{r}
@@ -24,112 +23,58 @@ best_lambdas <- bcbc_obj$lambda_cv$cv_data |>
 
 best_lambda_index <- best_lambdas[1, "param_index"]
 fit <- bcbc_obj$lambda_cv$all_runs[[best_lambda_index]]
-# fit <- cv_obj$lambda_cv$all_runs[[2]]
 
 
 plot(sort(fit$w))
-# plot_fit(bcbc_result_to_df(fit, filter_weight = 0, labels = labels))
-plot_fit(bcbc_result_to_df(fit, filter_weight = 0, labels = labels), bin_scale = 10)
-plot_fit(bcbc_result_to_df(fit, filter_weight = 3e-4, labels = labels))
+plot_fit(bcbc_result_to_df(fit, filter_weight = 0, labels = labels))
+plot_fit(bcbc_result_to_df(fit, filter_weight = 0, labels = labels), bin_scale = 20)
+plot_fit(bcbc_result_to_df(fit, filter_weight = 1 / 4026, labels = labels))
 ```
 
 ```{r}
-top_k_indices <- function(vec, k) {
-  order(vec, decreasing = TRUE)[1:k]
-}
-
-
-top_100_weights = top_k_indices(fit$w, 100)
-top_100_missing = top_k_indices(apply(X, 2, function(w) { sum(is.na(w))}), 100)
-# 
-# gene_names$NAME[intersect(top_100_weights, top_100_missing)]
-# 
-gene_names$NAME[top_k_indices(fit$w, 50)]
-
-
-table(bcbc_obj$lambda_cv$col_clusters[[best_lambdas[1, "index"]]][top_k_indices(fit$w, 500)])
-```
-
-```{r}
-survival = read.csv("~/DLCL_survival_IPI.txt", header = TRUE, sep = "\t")
-all_DLCL = colnames(lym)[grepl("DLCL", colnames(lym))]
-
-DLCL_table = tibble(
-  DLCL.Sample.Identifier = all_DLCL,
-  cluster = bcbc_obj$lambda_cv$row_clusters[[best_lambdas[1, "index"]]][labels == 1]
-) |>
-  inner_join(survival, by = "DLCL.Sample.Identifier")
-
-```
-
-```{r}
-
-col_clusters = bcbc_obj$lambda_cv$col_clusters[[best_lambdas[1, "index"]]]
-
-col_clusters_w_weights = tibble(
-  weight = fit$w,
-  cluster = col_clusters
-) |>
-  arrange(-weight) |>
+col_clusters_w_weights <- tibble(
+    weight = fit$w,
+    cluster = bcbc_obj$lambda_cv$col_clusters[[best_lambdas[1, "index"]]],
+    name = gene_names$NAME,
+    num_missing = apply(X, 2, function(w) { sum(is.na(w))}),
+    weight_rank = rank(-weight),
+    missing_rank = rank(-num_missing, ties.method = "min"),
+  ) |>
   mutate(index = row_number())
+
+col_clusters_w_weights |> filter(weight_rank < 100, missing_rank < 100)
 
 cluster_info = col_clusters_w_weights |> group_by(cluster) |>
   summarise(
     n = n(),
-    mean = mean(weight),
-    mean_norm = mean(weight) * 4026,
-    sum = sum(weight),
-    max = max(weight),
-    max_norm = max(weight) * 4026,
-    index = first(index)
-  )
+    mean_weight = mean(weight),
+    mean_weight_norm = mean(weight) * 4026,
+    sum_weight = sum(weight),
+    max_weight = max(weight),
+    max_weight_norm = max(weight) * 4026,
+    highest_gene = index[which.max(weight)],
+    highest_gene_name = name[which.max(weight)]
+  ) |>
+  arrange(-mean_weight) |>
+  mutate(mean_weight_rank = row_number())
 
-sample_genes = gene_names$NAME[(cluster_info |> arrange(max))$index[1:10]]
-
-top_cluster_genes1 = which(col_clusters == 128)
-top_cluster_genes2 = which(col_clusters == 120)
-top_cluster_genes3 = which(col_clusters == 60)
-top_cluster_genes4 = which(col_clusters == 18)
-top_cluster_genes5 = which(col_clusters == 134)
-top_cluster_genes6 = which(col_clusters == 27)
-top_cluster_genes7 = which(col_clusters == 21)
-top_cluster_genes8 = which(col_clusters == 209)
-top_cluster_genes9 = which(col_clusters == 123)
-top_cluster_genes10 = which(col_clusters == 17)
 ```
 
 ```{r}
 
 method = "single"
-plot_df <- bcbc_result_to_df(fit, labels = labels, cluster_with_weights = F, method=method)
-
-
-top_cluster_cols1 = plot_df |> filter(col_num %in% top_cluster_genes1)
-top_cluster_cols2 = plot_df |> filter(col_num %in% top_cluster_genes2)
-top_cluster_cols3 = plot_df |> filter(col_num %in% top_cluster_genes3)
-top_cluster_cols4 = plot_df |> filter(col_num %in% top_cluster_genes4)
-top_cluster_cols5 = plot_df |> filter(col_num %in% top_cluster_genes5)
-top_cluster_cols6 = plot_df |> filter(col_num %in% top_cluster_genes6)
-top_cluster_cols7 = plot_df |> filter(col_num %in% top_cluster_genes7)
-top_cluster_cols8 = plot_df |> filter(col_num %in% top_cluster_genes8)
-top_cluster_cols9 = plot_df |> filter(col_num %in% top_cluster_genes9)
-top_cluster_cols10 = plot_df |> filter(col_num %in% top_cluster_genes10)
-
+plot_df <- bcbc_result_to_df(fit, labels = labels, cluster_with_weights = F, method = method)
+plot_df <- plot_df |>
+  inner_join(col_clusters_w_weights |> dplyr::select(-weight), by = c("col_num" = "index")) |>
+  inner_join(cluster_info |> dplyr::select(cluster, mean_weight_rank, n), by = "cluster")
 
 fill_attr = "value"
 bin_scale = 100
 
-w_vals = sqrt(fit$w^2 + fit$lambda * fit$w)
-matrix <- sweep(fit$U, 2, fit$w, "*")
+num_top_clusters = 8
+cluster_labels = strsplit(substr("ABCDEFGHIJKLMNOPQRSTUVWXYZ", 1, num_top_clusters), "")[[1]]
 
-row_dist <- dist(matrix)
-col_dist <- as.matrix(dist(t(fit$U)))
-
-h_row <- hclust(row_dist)
-
-col_dist <- col_dist # - min(col_dist[col_dist > 0])
-diag(col_dist) <- 0 
-col_hclust <- hclust(as.dist(col_dist), method = method)
+col_hclust <- hclust(dist(t(fit$U)), method = method)
 col_hclust_data <- dendro_data(col_hclust, type = "rectangle")
 
 label_annotation <- annotate(
@@ -145,29 +90,30 @@ label_annotation <- annotate(
   )
 )
 
-# raster <- geom_tile(aes(fill = .data[[fill_attr]]), color = NA)
 raster <- geom_raster(aes(fill = .data[[fill_attr]]))
+
 if (!bin_scale) {
   plot_scale = scale_fill_gradient2()
 } else {
   plot_scale = scale_fill_steps2(n.breaks = bin_scale)
 }
 
-cluster_lefts <- c(min(top_cluster_cols1$order_col), min(top_cluster_cols2$order_col),
-           min(top_cluster_cols3$order_col), min(top_cluster_cols4$order_col),
-           min(top_cluster_cols5$order_col), min(top_cluster_cols6$order_col),
-           min(top_cluster_cols7$order_col), min(top_cluster_cols8$order_col),
-           min(top_cluster_cols9$order_col), min(top_cluster_cols10$order_col))
-cluster_rights <- c(max(top_cluster_cols1$order_col), max(top_cluster_cols2$order_col),
-           max(top_cluster_cols3$order_col), max(top_cluster_cols4$order_col),
-           max(top_cluster_cols5$order_col), max(top_cluster_cols6$order_col),
-           max(top_cluster_cols7$order_col), max(top_cluster_cols8$order_col),
-           max(top_cluster_cols9$order_col), max(top_cluster_cols10$order_col))
+bicluster_rects <- plot_df |>
+  filter(mean_weight_rank <= num_top_clusters) |>
+  group_by(cluster, mean_weight_rank) |>
+  summarise(cluster_left = min(order_col), cluster_right = max(order_col), n = first(n)) |>
+  ungroup() |>
+  arrange(mean_weight_rank) |>
+  mutate(label = cluster_labels,
+         midpoint = (cluster_left + cluster_right) / 2)
+
+# Check rectangles are continuous
+bicluster_rects$cluster_right - bicluster_rects$cluster_left - bicluster_rects$n
 
 bicluster_annotation = annotate(
   "rect",
-  xmin = cluster_lefts,
-  xmax = cluster_rights,
+  xmin = bicluster_rects$cluster_left,
+  xmax = bicluster_rects$cluster_right,
   ymin = 0.5,
   ymax = 62.5,
   fill = NA,
@@ -178,25 +124,13 @@ bicluster_annotation = annotate(
 
 text_annotation = annotate(
   "text",
-  x = (cluster_lefts + cluster_rights) / 2,
+  x = bicluster_rects$midpoint,
   y = -5,
-  label = c("A", "B", "C", "D", "E", "F", "G", "H","I", "J"),
+  label = bicluster_rects$label,
   color = "black"
 )
 
 y_start = max(plot_df$order_row) + 1
-
-# Verify rectangles are correct sizes
-max(top_cluster_cols1$order_col) - min(top_cluster_cols1$order_col) - length(unique(top_cluster_cols1$order_col))
-max(top_cluster_cols2$order_col) - min(top_cluster_cols2$order_col) - length(unique(top_cluster_cols2$order_col))
-max(top_cluster_cols3$order_col) - min(top_cluster_cols3$order_col) - length(unique(top_cluster_cols3$order_col))
-max(top_cluster_cols4$order_col) - min(top_cluster_cols4$order_col) - length(unique(top_cluster_cols4$order_col))
-max(top_cluster_cols5$order_col) - min(top_cluster_cols5$order_col) - length(unique(top_cluster_cols5$order_col))
-max(top_cluster_cols6$order_col) - min(top_cluster_cols6$order_col) - length(unique(top_cluster_cols6$order_col))
-max(top_cluster_cols7$order_col) - min(top_cluster_cols7$order_col) - length(unique(top_cluster_cols7$order_col))
-max(top_cluster_cols8$order_col) - min(top_cluster_cols8$order_col) - length(unique(top_cluster_cols8$order_col))
-max(top_cluster_cols9$order_col) - min(top_cluster_cols9$order_col) - length(unique(top_cluster_cols9$order_col))
-max(top_cluster_cols10$order_col) - min(top_cluster_cols10$order_col) - length(unique(top_cluster_cols10$order_col))
 ```
 
 
@@ -209,13 +143,13 @@ ggplot(plot_df, aes(x = order_col, y = order_row)) +
                aes(x = x, y = y_start + y / max(y) * 20, xend = xend, yend = y_start + yend / max(yend) * 20)
   ) +
   bicluster_annotation +
-  scale_x_continuous(breaks = (cluster_lefts + cluster_rights) / 2,
-                     labels = c("A", "B", "C", "D", "E", "F", "G", "H","I", "J")) +
+  scale_x_continuous(breaks = bicluster_rects$midpoint,
+                     labels = bicluster_rects$label) +
   theme_minimal() +
   theme(
     axis.text.x = element_text(color = "black", size = 10, face = "bold",
                                margin = margin(t = 1), family = "Times"),
-    axis.ticks.x = element_line(color = "black", size = 1),
+    axis.ticks.x = element_line(color = "black", linewidth = 1),
     axis.ticks.length = unit(0.25, "cm"),
     axis.text.y = element_blank(),
     axis.ticks.y = element_blank(),
@@ -236,26 +170,25 @@ ggsave("~/BCBC/real_data_experiments/lymphoma.pdf",
 ```
 
 ```{r}
-gene_names$NAME[top_cluster_genes1[order(-fit$w[top_cluster_genes1])][1]]
-gene_names$NAME[top_cluster_genes2[order(-fit$w[top_cluster_genes2])][1]]
-gene_names$NAME[top_cluster_genes3[order(-fit$w[top_cluster_genes3])][1]]
-gene_names$NAME[top_cluster_genes4[order(-fit$w[top_cluster_genes4])][1]]
-gene_names$NAME[top_cluster_genes5[order(-fit$w[top_cluster_genes5])][1]]
-gene_names$NAME[top_cluster_genes6[order(-fit$w[top_cluster_genes6])][1]]
-gene_names$NAME[top_cluster_genes7[order(-fit$w[top_cluster_genes7])][1]]
-gene_names$NAME[top_cluster_genes8[order(-fit$w[top_cluster_genes8])][1]]
-gene_names$NAME[top_cluster_genes9[order(-fit$w[top_cluster_genes9])][1]]
-gene_names$NAME[top_cluster_genes10[order(-fit$w[top_cluster_genes10])][1]]
+table1 <- cluster_info |>
+  arrange(-mean_weight) |>
+  head(num_top_clusters) |>
+  mutate(Label = cluster_labels,
+         mean_weight_norm = round(mean_weight_norm, 2),
+         max_weight_norm = round(max_weight_norm, 2)) |>
+  rename(Size = n,
+         `Mean Weight` = mean_weight_norm, 
+         `Max Weight` = max_weight_norm,
+         `Highest Weight mRNA Sample` = highest_gene_name) |>
+  dplyr::select(
+    Label,
+    Size,
+    `Mean Weight`,
+    `Max Weight`,
+    `Highest Weight mRNA Sample`
+  )
 
+# As LaTeX table
+cat(apply(table1, 1, function(r) paste(r, collapse = " & ")), sep = " \\\\\n")
 
-genes = c(top_cluster_genes1[order(-fit$w[top_cluster_genes1])][1],
-          top_cluster_genes1[order(-fit$w[top_cluster_genes2])][1],
-          top_cluster_genes1[order(-fit$w[top_cluster_genes3])][1],
-          top_cluster_genes1[order(-fit$w[top_cluster_genes4])][1],
-          top_cluster_genes1[order(-fit$w[top_cluster_genes5])][1],
-          top_cluster_genes1[order(-fit$w[top_cluster_genes6])][1],
-          top_cluster_genes1[order(-fit$w[top_cluster_genes7])][1],
-          top_cluster_genes1[order(-fit$w[top_cluster_genes8])][1],
-          top_cluster_genes1[order(-fit$w[top_cluster_genes9])][1],
-          top_cluster_genes1[order(-fit$w[top_cluster_genes10])][1])
 ```
