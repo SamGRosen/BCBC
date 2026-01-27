@@ -29,11 +29,10 @@ n <- nrow(all_checkers[[ARRAY_ID]]$X)
 p <- ncol(all_checkers[[ARRAY_ID]]$X)
 k_samples <- 5
 k_features <- 5
-phi <- 1
 lambdas <- seq(0, 160, 4) / p
 gammas = n * 1.5 ^ seq(-4, 4, 1)
 
-holdout_out_tmax_hierarchy = c(2, 200, 200)
+holdout_out_tmax_hierarchy = c(5, 300, 400)
 
 fit_tmax_hierarchy = holdout_out_tmax_hierarchy[2:3]
 
@@ -47,7 +46,6 @@ if(matched_algo == 1) {
     gammas = gammas,
     k_samples = c(k_samples),
     k_features = c(k_features),
-    phis = c(phi),
     tols = c(10 ^ -4),
     tmax_hierarchy = holdout_out_tmax_hierarchy,
     recalculate_weights = c(TRUE),
@@ -64,14 +62,16 @@ if(matched_algo == 1) {
     lambdas = lambdas,
     k_samples = c(k_samples),
     k_features = c(k_features),
-    phi = c(phi),
     percent_noise = seq(0.025, 0.25, 0.025),
     recalculate_weights = TRUE,
     tols = c(1e-4),
-    tmax_outer = fit_tmax_hierarchy[1],
+    tmax_outer = 2 * fit_tmax_hierarchy[1],
     tmax_cobra = fit_tmax_hierarchy[2]
   )
 } else if(matched_algo == 2) {
+  holdout_out_tmax_hierarchy = c(2, 50, 200)
+  fit_tmax_hierarchy = holdout_out_tmax_hierarchy[2:3]
+
   result <- cv.BCBC_holdout(
     all_checkers[[ARRAY_ID]]$X,
     holdout_size = 0.25,
@@ -79,9 +79,8 @@ if(matched_algo == 1) {
     gammas = gammas,
     k_samples = c(k_samples),
     k_features = c(k_features),
-    phis = c(phi),
     tols = c(10 ^ -4),
-    tmax_hierarchy = c(2, 50, 200), # holdout_out_tmax_hierarchy,
+    tmax_hierarchy = holdout_out_tmax_hierarchy,
     recalculate_weights = c(FALSE),
     return_fits = debug
   )
@@ -96,12 +95,11 @@ if(matched_algo == 1) {
     lambdas = lambdas,
     k_samples = c(k_samples),
     k_features = c(k_features),
-    phi = c(phi),
     recalculate_weights = c(FALSE),
     percent_noise = seq(0.025, 0.25, 0.025),
     tols = c(1e-4),
-    tmax_outer = 300, # fit_tmax_hierarchy[1],
-    tmax_cobra = 200 # fit_tmax_hierarchy[2],
+    tmax_outer = 2 * fit_tmax_hierarchy[1],
+    tmax_cobra = fit_tmax_hierarchy[2]
   )
 } else if(matched_algo == 3) {
   result <- cv.BCBC_holdout(
@@ -111,7 +109,6 @@ if(matched_algo == 1) {
     gammas = gammas,
     k_samples = c(k_samples),
     k_features = c(k_features),
-    phis = c(phi),
     tols = c(10 ^ -4),
     tmax_hierarchy = holdout_out_tmax_hierarchy,
     recalculate_weights = c(TRUE),
@@ -134,7 +131,6 @@ if(matched_algo == 1) {
     lambdas = lambdas,
     k_samples = c(k_samples),
     k_features = c(k_features),
-    phis = c(phi),
     recalculate_weights = c(TRUE),
     tols = c(1e-4),
     approx_neighbors = c(TRUE),
@@ -144,20 +140,19 @@ if(matched_algo == 1) {
       M = 16,
       n_threads = 4
     ),
-    tmax_outer = fit_tmax_hierarchy[1],
+    tmax_outer = 2 * fit_tmax_hierarchy[1],
     tmax_cobra = fit_tmax_hierarchy[2]
   )
 } else if (matched_algo == 4) {
   library(BCEL)
   result <- bcel_stable(all_checkers[[ARRAY_ID]]$X, r = 5)
 } else if(matched_algo == 5) {
-  wts <- fast_gkn_weights(
-    t(all_checkers[[ARRAY_ID]]$X),
-    k_row = k_features,
-    k_col = k_samples,
-    phi = phi,
-    approx = 0
-  )
+  library(cvxbiclustr)
+
+  wts <- cvxbiclustr::gkn_weights(t(all_checkers[[ARRAY_ID]]$X),
+                                  phi = 1,
+                                  k_row = k_features,
+                                  k_col = k_samples)
 
   gammas <- 2 ^ seq(-3, 15, 0.25)
   gamma_cv <-
@@ -185,6 +180,8 @@ if(matched_algo == 1) {
       max_iter = 2000
     )
 } else if(matched_algo == 6) {
+  library(cvxbiclustr)
+
   gammas <- 2 ^ seq(-3, 15, 0.25)
 
   top_k_indices <- function(vec, k) {
@@ -195,13 +192,11 @@ if(matched_algo == 1) {
   top_200 <- top_k_indices(scales, 200)
 
   X_prime <- all_checkers[[ARRAY_ID]]$X[, top_200]
-  wts <- fast_gkn_weights(
-    t(X_prime),
-    k_row = k_features,
-    k_col = k_samples,
-    phi = phi,
-    approx = 0
-  )
+
+  wts <- cvxbiclustr::gkn_weights(t(X_prime),
+                                  phi = 1,
+                                  k_row = k_features,
+                                  k_col = k_samples)
 
   gamma_cv <-
     cobra_validate(

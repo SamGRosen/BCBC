@@ -10,7 +10,6 @@ BCBC(
   k_features = 4,
   k_samples = 4,
   gamma = 10,
-  phi = 1,
   tmax = NA,
   tmax_cobra = 100,
   tmax_outer = 100,
@@ -34,8 +33,6 @@ BCBC(
 \item{k_samples}{number of nearest neighbors used to calculate sample affinity graph}
 
 \item{gamma}{fusion hyperparameter}
-
-\item{phi}{bandwidth of affinity graph kernel}
 
 \item{tmax}{number of max iterations for COBRA and PALM}
 
@@ -64,7 +61,7 @@ list for BCBC fit including
 \enumerate{
 \item \code{U} fitted matrix
 \item \code{w} fitted weights
-\item \code{lambda}, \code{gamma}, \code{k_features}, \code{k_samples}, \code{phi}, \code{recalculate_weights}  input parameters
+\item \code{lambda}, \code{gamma}, \code{k_features}, \code{k_samples}, \code{recalculate_weights}  input parameters
 \item \code{cobra_diffs} difference in \code{U} iterates
 \item \code{w_diffs} difference in \code{w} iterates
 \item \code{w_path} all \code{w} iterates

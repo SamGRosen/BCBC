@@ -10,11 +10,8 @@ Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
 Suggests:
     ggplot2,
-    future.apply
 Imports:
     Matrix,
     dbscan,
-    igraph,
     tidyr,
-    dplyr,
-    stringr
+    dplyr

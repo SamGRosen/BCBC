@@ -4,7 +4,8 @@
 #' @param threshold radius to join rows into communities
 #'
 #' @return vector of row memberships
-#' @import dbscan
+#' @importFrom dbscan comps
+#' @importFrom dbscan frNN
 #' @export
 #' @seealso [dbscan::frNN()]
 #'
@@ -17,7 +18,7 @@ get_row_clusters <- function(mat, threshold) {
     warning(paste("threshold is invalid:", threshold))
     threshold <- 0
   }
-  row_clusters <- dbscan::comps(frNN(mat, threshold, sort=F))
+  row_clusters <- dbscan::comps(dbscan::frNN(mat, threshold, sort=F))
   names(row_clusters) <- 1:nrow(mat)
 
   row_clusters
@@ -32,7 +33,8 @@ get_row_clusters <- function(mat, threshold) {
 #' @param maxiter number of iters used to find radius
 #'
 #' @return radius for k connected components
-#' @import dbscan
+#' @importFrom dbscan comps
+#' @importFrom dbscan frNN
 #' @export
 #'
 #' @examples
@@ -43,7 +45,7 @@ threshold_for_k_components <- function(dist_mat,
                                        max_threshold = max(dist_mat),
                                        maxiter = 50) {
   get_num_components_err <- function(threshold) {
-    length(unique(dbscan::comps(frNN(
+    length(unique(dbscan::comps(dbscan::frNN(
       dist_mat, threshold, sort = F
     )))) - k
   }

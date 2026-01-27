@@ -1,269 +1,83 @@
-#' Convex Biclustering via Dykstra-like Proximal Algorithm
+#' Dykstra-like proximal algorithm from Convex Biclustering by Chi et al.
 #'
-#' \code{cobra_internal} is an R wrapper around C code.
+#' @param X data matrix
+#' @param gamma regularization parameter
+#' @param W_row `sparseweights` object output from `knn_graph` for row fusion
+#' @param W_col `sparseweights` object output from `knn_graph` for col fusion
+#' @param max_iter number of convex cluster optimizations to solve
+#' @param max_iter_inner number of inner iterations for `CCMMR`
+#' @param tol of convergence
 #'
-#' @param X Data matrix
-#' @param Lambda_row Initial guess of row Langrage multipliers
-#' @param Lambda_col Initial guess of column Langrage multipliers
-#' @param E_row Edge-incidence matrix for row graph
-#' @param E_col Edge-incidence matrix for column graph
-#' @param w_row Vector of weights for row graph
-#' @param w_col Vector of weights for column graph
-#' @param gamma Regularization parameter for shrinkage
-#' @param max_iter Maximum number of AMA iterations
-#' @param tol stopping tolerance
-#' @useDynLib BCBC
-cobra_internal <- function(X, Lambda_row,Lambda_col,E_row,E_col,w_row,w_col,gamma,
-                           max_iter=1e2, tol=1e-3) {
-  ## Get matrix dimensions
-  m_row <- as.integer(nrow(E_row))
-  m_col <- as.integer(nrow(E_col))
-  n <- as.integer(ncol(X)); p <- as.integer(nrow(X))
-
-  ## Unpack sparse matrix information for E_row
-  column_ptr_row <- as.integer(E_row@p)
-  values_row <- as.double(E_row@x)
-  row_indices_row <- as.integer(E_row@i)
-
-  ## Unpack sparse matrix information for E_col
-  column_ptr_col <- as.integer(E_col@p)
-  values_col <- as.double(E_col@x)
-  row_indices_col <- as.integer(E_col@i)
-
-  ## Cast types
-  XT <- t(X)
-  storage.mode(XT) <- "double"
-
-  LambdaT_row <- t(Lambda_row)
-  storage.mode(LambdaT_row) <- "double"
-  LambdaT_temp_row <- matrix(0,m_row,n)
-  storage.mode(LambdaT_temp_row) <- "double"
-  LambdaT_old_row <- matrix(0,m_row,n)
-  storage.mode(LambdaT_old_row) <- "double"
-  dLambdaT_row <- matrix(0,m_row,n)
-  storage.mode(dLambdaT_row) <- "double"
-  gLambdaT_row <- matrix(0,m_row,n)
-  storage.mode(gLambdaT_row) <- "double"
-  gLambdaT_old_row <- matrix(0,m_row,n)
-  storage.mode(gLambdaT_old_row) <- "double"
-
-  LambdaT_col <- t(Lambda_col)
-  storage.mode(LambdaT_col) <- "double"
-  LambdaT_temp_col <- matrix(0,m_col,p)
-  storage.mode(LambdaT_temp_col) <- "double"
-  LambdaT_old_col <- matrix(0,m_col,p)
-  storage.mode(LambdaT_old_col) <- "double"
-  dLambdaT_col <- matrix(0,m_col,p)
-  storage.mode(dLambdaT_col) <- "double"
-  gLambdaT_col <- matrix(0,m_col,p)
-  storage.mode(gLambdaT_col) <- "double"
-  gLambdaT_old_col <- matrix(0,m_col,p)
-  storage.mode(gLambdaT_old_col) <- "double"
-
-  VT_row <- matrix(0,m_row,n)
-  storage.mode(VT_row) <- "double"
-  VT_col <- matrix(0,m_col,p)
-  storage.mode(VT_col) <- "double"
-
-  UT <- matrix(0,n,p)
-  storage.mode(UT) <- "double"
-
-  YT <- matrix(0,p,n)
-  storage.mode(YT) <- "double"
-
-  PT <- matrix(0,n,p)
-  storage.mode(PT) <- "double"
-
-  QT <- matrix(0,p,n)
-  storage.mode(QT) <- "double"
-
-  w_row <- as.double(gamma*w_row)
-  w_col <- as.double(gamma*w_col)
-  nu_row <- as.double(1/nrow(X))
-  nu_col <- as.double(1/ncol(X))
-
-  primal_row <- double(max_iter)
-  dual_row <- double(max_iter)
-  primal_col <- double(max_iter)
-  dual_col <- double(max_iter)
-  max_iter <- as.integer(max_iter)
-  tol <- as.double(tol)
-
-  #  void test_convex_bicluster_dlpa(double *xt,
-  #                                  double *lambdat_row,
-  #                                  double *lambdat_temp_row, double *lambdat_old_row, double *dlambdat_row,
-  #                                  double *glambdat_row, double *glambdat_old_row,
-  #                                  double *lambdat_col,
-  #                                  double *lambdat_temp_col, double *lambdat_old_col, double *dlambdat_col,
-  #                                  double *glambdat_col, double *glambdat_old_col,
-  #                                  double *vt_row, double *vt_col,
-  #                                  double *ut, double *yt, double *pt, double *qt,
-  #                                  int *column_ptr_row, int *row_indices_row, double *values_row,
-  #                                  int *column_ptr_col, int *row_indices_col, double *values_col,
-  #                                  int *m_row, int *m_col, int *n, int *p,
-  #                                  double *w_row, double *w_col,
-  #                                  double *nu_row, double *nu_col,
-  #                                  double *primal_row, double *dual_row,
-  #                                  double *primal_col, double *dual_col,
-  #                                  int *max_iter, int *iter, double *tol) {
-  sol <- .C('test_convex_bicluster_dlpa',XT=XT,
-            LambdaT_row=LambdaT_row,
-            LambdaT_temp_row=LambdaT_temp_row,LambdaT_old_row=LambdaT_old_row,dLambdaT_row=dLambdaT_row,
-            gLambdaT_row=gLambdaT_row,gLambdaT_old_row=gLambdaT_old_row,
-            LambdaT_col=LambdaT_col,
-            LambdaT_temp_col=LambdaT_temp_col,LambdaT_old_col=LambdaT_old_col,dLambdaT_col=dLambdaT_col,
-            gLambdaT_col=gLambdaT_col,gLambdaT_old_col=gLambdaT_old_col,
-            VT_row=VT_row,VT_col=VT_col,
-            UT=UT,YT=YT,PT=PT,QT=QT,
-            column_ptr_row=column_ptr_row,row_indices_row=row_indices_row,values_row=values_row,
-            column_ptr_col=column_ptr_col,row_indices_col=row_indices_col,values_col=values_col,
-            m_row=m_row,m_col=m_col,n=n,p=p,
-            w_row=w_row,w_col=w_col,
-            nu_row=nu_row,nu_col=nu_col,
-            primal_row=primal_row,dual_row=dual_row,
-            primal_col=primal_col,dual_col=dual_col,
-            max_iter=max_iter,iter=integer(1),tol=tol)
-  return(list(UT=sol$UT,YT=sol$YT,LambdaT_row=sol$LambdaT_row,VT_row=sol$VT_row,
-              LambdaT_col=sol$LambdaT_col,VT_col=sol$VT_col,
-              nu_row=sol$nu_row,nu_col=sol$nu_col,
-              primal_row=sol$primal_row[1:sol$iter],dual_row=sol$dual_row[1:sol$iter],
-              primal_col=sol$primal_col[1:sol$iter],dual_col=sol$dual_col[1:sol$iter],
-              iter=sol$iter))
-}
-
-#' Convex Biclustering Algorithm
-#'
-#' \code{cobra} computes a convex biclustering path via Dykstra-like Proximal Algorithm
-#'
-#' @param X The data matrix to be clustered. The rows are the features, and the columns are the samples.
-#' @param E_row Edge-incidence matrix for row graph
-#' @param E_col Edge-incidence matrix for column graph
-#' @param w_row Vector of weights for row graph
-#' @param w_col Vector of weights for column graph
-#' @param gamma A sequence of regularization parameters for row and column shrinkage
-#' @param max_iter Maximum number of iterations
-#' @param tol Stopping criterion
+#' @return fitted bicluster matrix
+#' @import CCMMR
+#' @seealso [fast_gkn_weights()]
+#' @seealso [knn_graph()]
+#' @seealso [knn_graph_approx()]
 #' @export
+#'
 #' @examples
-#' ## Create bicluster path
-#' ## Example: Lung
-#' X <- lung
-#' X <- X - mean(X)
-#' X <- X/norm(X,'f')
+#' checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 0, shuffle = FALSE)
+#' W_row <- knn_graph(checker$X, 5)
+#' W_col <- knn_graph(t(checker$X), 5)
+#' cobra_fit <- cobra(checker$X, gamma = 10000, W_row = W_row, W_col = W_col)
 #'
-#' ## Create annotation for heatmap
-#' types <- colnames(lung)
-#' ty <- as.numeric(factor(types))
-#' cols <- rainbow(4)
-#' YlGnBu5 <- c('#ffffd9','#c7e9b4','#41b6c4','#225ea8','#081d58')
-#' hmcols <- colorRampPalette(YlGnBu5)(256)
-#'
-#' ## Construct weights and edge-incidence matrices
-#' phi <- 0.5; k <- 5
-#' wts <- gkn_weights(X,phi=phi,k_row=k,k_col=k)
-#' w_row <- wts$w_row
-#' w_col <- wts$w_col
-#' E_row <- wts$E_row
-#' E_col <- wts$E_col
-#'
-#' ## Connected Components of Row and Column Graphs
-#' wts$nRowComp
-#' wts$nColComp
-#'
-#' #### Initialize path parameters and structures
-#' nGamma <- 5
-#' gammaSeq <- 10**seq(0,3,length.out=nGamma)
-#'
-#' ## Generate solution path
-#' sol <- cobra_validate(X,E_row,E_col,w_row,w_col,gammaSeq)
-#'
-#' ix <- 4
-#' heatmap(sol$U[[ix]],col=hmcols,labRow=NA,labCol=NA,ColSideCol=cols[ty])
-cobra <- function(X,E_row,E_col,w_row,w_col,gamma,max_iter=1e2,tol=1e-3) {
-  call <- match.call()
-  nGamma <- length(gamma)
+#' plot_fit(matrix_fit_to_df(cobra_fit))
+cobra <- function(X,
+                  gamma,
+                  W_row,
+                  W_col,
+                  max_iter = 1e2,
+                  max_iter_inner = 1e2,
+                  tol = 1e-4) {
+  U = matrix(X, nrow = nrow(X), ncol = ncol(X))
+  P = matrix(0, nrow = nrow(X), ncol = ncol(X))
+  Q = matrix(0, nrow = ncol(X), ncol = nrow(X))
 
-  ## Get matrix dimensions
-  m_row <- as.integer(nrow(E_row))
-  m_col <- as.integer(nrow(E_col))
-  n <- as.integer(ncol(X)); p <- as.integer(nrow(X))
+  diff = 10 * tol
+  iter = 1
+  while (diff > tol && iter < max_iter) {
+    Y = convex_clusterpath(
+      t(U) + t(P),
+      W_col,
+      gamma,
+      center = F,
+      scale = F,
+      max_iter_conv = max_iter_inner,
+      eps_conv = tol
+    )$coordinates
 
-  ## Check matrix dimensions
-  check_E_row <- ncol(E_row) == p
-  check_E_col <- ncol(E_col) == n
-  check <- check_E_row && check_E_col
+    P_prime = U + P - t(Y)
 
-  if ( !check )
-    stop(paste(
-        "Incidence matrix dimensions do not match input matrix",
-        ncol(E_row), n, p))
+    U_prime = convex_clusterpath(
+      t(Y) + t(Q),
+      W_row,
+      gamma,
+      center = F,
+      scale = F,
+      max_iter_conv = max_iter_inner,
+      eps_conv = tol
+    )$coordinate
+    Q_prime = Y + Q - t(U_prime)
 
-  ## Check weights vectors have correct length and are positive
-  check_w_row <- (length(w_row) == m_row) && all(w_row > 0)
-  if ( !check_w_row ) {
-    stop(paste("Row weights invalid",
-               length(w_row), "?=", m_row, " or ", "min(w_row) =", min(w_row)))
+    diff = sqrt(sum((U_prime - t(Y)) ^ 2)) / ncol(X) / nrow(X)
+
+    P = P_prime
+    U = U_prime
+    Q = Q_prime
+    iter = iter + 1
   }
-  check_w_col <- (length(w_col) == m_col) && all(w_col > 0)
-  if ( !check_w_col ) {
-    stop(paste("Col weights invalid",
-               length(w_col), "?=", m_col, " or ", "0 <? min(w_col) =", min(w_col)))
-  }
-  check <- check && check_w_row && check_w_col
-
-  ## Check that m_row <= p*(p-1)/2 and m_col <= n*(n-1)/2
-  check_m <- (m_row <= p*(p-1)/2) && (m_col <= n*(n-1)/2)
-  check <- check && check_m
-
-  if ( !check )
-    stop("Dimensions of E_row, E_col, w_row, w_col, and X are not consistent.")
-
-  ## Initialize dual variables
-  Lambda_row <- matrix(0,n,m_row)
-  Lambda_col <- matrix(0,p,m_col)
-  list_U <- vector(mode="list",length=nGamma)
-  list_V_col <- vector(mode="list",length=nGamma)
-  list_V_row <- vector(mode="list",length=nGamma)
-  list_Lambda_col <- vector(mode="list",length=nGamma)
-  list_Lambda_row <- vector(mode="list",length=nGamma)
-  list_cluster_col <- vector(mode="list",length=nGamma)
-  list_size_col <- vector(mode="list",length=nGamma)
-  list_cluster_row <- vector(mode="list",length=nGamma)
-  list_size_row <- vector(mode="list",length=nGamma)
-
-  iter_vec <- integer(nGamma)
-  for (ig in 1:nGamma) {
-    gam <- as.double(gamma[ig])
-    sol <- cobra_internal(X,Lambda_row,Lambda_col,E_row,E_col,w_row,w_col,gam)
-
-    ## Homotopy
-    list_Lambda_col[[ig]] <- Lambda_col <- t(sol$LambdaT_col)
-    list_Lambda_row[[ig]] <- Lambda_row <- t(sol$LambdaT_row)
-
-    list_U[[ig]] <- t(sol$U)
-    list_V_row[[ig]] <- t(sol$VT_row)
-    list_V_col[[ig]] <- t(sol$VT_col)
-
-    row_gap <- sol$primal_row[sol$iter]-sol$dual_row[sol$iter]
-    col_gap <- sol$primal_col[sol$iter]-sol$dual_col[sol$iter]
-  }
-  return(list(U=list_U,V_row=list_V_row,V_col=list_V_col,
-              Lambda_col=list_Lambda_col,Lambda_row=list_Lambda_row))
+  U
 }
 
 
 #' Utility method to use COBRA internals and calculate weights
 #'
-#' @param X data matrix
-#' @param gamma fusion hyperparameter
 #' @param k_samples number of nearest neighbors for sample affinity graph
 #' @param k_features number of nearest neighbors for feature affinity graph
-#' @param phi bandwidth parameter
-#' @param max_iter of COBRA
-#' @param tol for termination
-#'
+#' @inherit cobra params
+#' @inherit cobra return
+#' @inherit cobra seealso
 #' @return fitted bicluster matrix
-#' @seealso [fast_gkn_weights()]
 #' @export
 #'
 #' @examples
@@ -273,26 +87,102 @@ cobra_knn <- function(X,
                       gamma,
                       k_samples = 2,
                       k_features = 2,
-                      phi = 1,
                       max_iter = 250,
+                      max_iter_inner = 250,
                       tol = 1e-4) {
   wts <- fast_gkn_weights(
-    t(X),
-    k_row = k_features,
-    k_col = k_samples,
-    phi = phi,
-    approx = 0
+    X,
+    k_row = k_samples,
+    k_col = k_features,
+    approx = FALSE
   )
-  cobra_result <-
-    cobra(
-      t(X),
-      wts$E_row,
-      wts$E_col,
-      wts$w_row,
-      wts$w_col,
+  cobra(
+    X,
+    gamma = gamma,
+    W_row = wts$W_row,
+    W_col = wts$W_col,
+    max_iter = max_iter,
+    max_iter_inner = max_iter_inner,
+    tol = tol
+  )
+}
+
+
+#' Algorithm 2 of Convex Biclustering by Chi et al.
+#'
+#' @inheritParams cobra
+#' @param tmax_hierarchy vector of 3 values
+#'  1. number of COBRA fits
+#'  2. number of number of Convex Clustering fits per COBRA fit
+#'  3. number of iterations per Convex Clustering fit
+#' @param progress show progress
+#' @return list with info
+#'   4. `valid_rss` unweighted RSS of non-missing values
+#'   6. `filled_vals` imputed values from each COBRA fit
+#'   7. `invalid_indices` indices of missing values
+#'   8. `time` to run
+#' @export
+COBRA_missing <- function(X,
+                          W_row,
+                          W_col,
+                          gamma = 10,
+                          tmax_hierarchy = c(50, 10, 1000),
+                          tol = 1e-4,
+                          progress = FALSE) {
+  n <- nrow(X)
+  p <- ncol(X)
+  valid_indices <- which(is.finite(X), arr.ind = TRUE)
+  invalid_indices <- which(!is.finite(X), arr.ind = TRUE)
+
+  missing_columns <- sort(unique(invalid_indices[, 2]))
+  stopifnot("missing values must have length > 0"= nrow(invalid_indices) > 0)
+  stopifnot("tmax_hierarchy must have length 3"= length(tmax_hierarchy) == 3)
+
+  U = X
+  U[invalid_indices] = mean(X[valid_indices])
+  valid_rss <- rep(NA, tmax_hierarchy[1])
+  filled_vals = matrix(NA, nrow=tmax_hierarchy[1], ncol=nrow(invalid_indices))
+
+  start <- Sys.time()
+  for(t in 1:tmax_hierarchy[1]) {
+    if (progress) {
+      print(t)
+    }
+
+    M <- X
+    M[invalid_indices] <- U[invalid_indices]
+    cobra_result <- cobra(
+      M,
       gamma = gamma,
-      max_iter = tmax_cobra,
+      W_row = W_row,
+      W_col = W_col,
+      max_iter = tmax_hierarchy[2],
+      max_iter_inner = tmax_hierarchy[3],
       tol = tol
     )
-  t(cobra_result$U[[1]])
+
+    U <- cobra_result
+
+    valid_rss[t] <- sum((X[valid_indices] - U[valid_indices]) ^ 2)
+
+    filled_vals[t, ] <- U[invalid_indices]
+
+    if(t > 1 &&
+       sum(abs(filled_vals[t - 1,] - filled_vals[t,])) / sum(abs(filled_vals[t, ])) < tol) {
+
+      filled_vals <- filled_vals[1:t, ]
+      break
+    }
+  }
+
+  end <- Sys.time()
+
+  return(
+    list(
+      valid_rss = valid_rss,
+      filled_vals = filled_vals,
+      invalid_indices = invalid_indices,
+      time = as.numeric(end - start, units = "secs")
+    )
+  )
 }

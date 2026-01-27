@@ -2,16 +2,15 @@
 % Please edit documentation in R/nearest_neighbors.R
 \name{fast_gkn_weights}
 \alias{fast_gkn_weights}
-\title{Build row and column info for usage with \code{BCBC}, \code{cobra} and subroutines.}
+\title{Build row and column info for usage with \code{BCBC}, \code{cobra} and subroutines
+using specification from paper. Use \code{knn_graph} or \code{knn_graph_approx} for
+more precise control.}
 \usage{
 fast_gkn_weights(
   X,
   k_row,
   k_col,
-  phi,
   approximate = FALSE,
-  rescale = TRUE,
-  uniform = FALSE,
   hnsw_args = list(ef = 50)
 )
 }
@@ -22,21 +21,18 @@ fast_gkn_weights(
 
 \item{k_col}{number of nearest neighbors for columns}
 
-\item{phi}{bandwidth for Gaussian kernel}
-
 \item{approximate}{use RcppHNSW for calculation}
 
-\item{rescale}{weights and bandwidth by this factor}
-
-\item{uniform}{treat all edges as equal magnitude}
-
-\item{hnsw_args}{passed to \code{RcppHNSW::hnsw_knn}}
+\item{hnsw_args}{passed to \code{RcppHNSW::hnsw_knn} if \code{approximate} is true}
 }
 \value{
-list of row and column info similar to \code{knn_graph} return info
+list of row and column info similar to \code{knn_graph} return info under
+\code{W_row} and \code{W_col} keys.
 }
 \description{
-Build row and column info for usage with \code{BCBC}, \code{cobra} and subroutines.
+Build row and column info for usage with \code{BCBC}, \code{cobra} and subroutines
+using specification from paper. Use \code{knn_graph} or \code{knn_graph_approx} for
+more precise control.
 }
 \examples{
 checker <- gen_checkerboard(n = 100,
@@ -45,7 +41,7 @@ checker <- gen_checkerboard(n = 100,
                             num_col_clusters = 5,
                             p_extra = 25,
                             shuffle = FALSE)
-fusion_wts <- fast_gkn_weights(t(checker$X), k_row = 4, k_col = 4, phi = 1)
+fusion_wts <- fast_gkn_weights(t(checker$X), k_row = 4, k_col = 4)
 calc_fusion_term(fusion_wts$unique_row_edges, fusion_wts$w_row, checker$X, rows=FALSE)
 calc_fusion_term(fusion_wts$unique_col_edges, fusion_wts$w_col, checker$X, rows=TRUE)
 }

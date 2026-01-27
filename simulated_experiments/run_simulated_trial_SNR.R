@@ -25,11 +25,10 @@ n <- nrow(all_checkers[[ARRAY_ID]]$X)
 p <- ncol(all_checkers[[ARRAY_ID]]$X)
 k_samples <- 5
 k_features <- 5
-phi <- 1
 lambdas <- seq(0, 50, 1.5) / p
 gammas = n * 1.5 ^ seq(-4, 4, 0.5)
 
-holdout_out_tmax_hierarchy = c(2, 200, 200)
+holdout_out_tmax_hierarchy = c(3, 100, 200)
 fit_tmax_hierarchy = holdout_out_tmax_hierarchy[2:3]
 
 debug = TRUE
@@ -42,7 +41,6 @@ if(matched_algo == 1) {
     gammas = gammas,
     k_samples = c(k_samples),
     k_features = c(k_features),
-    phis = c(phi),
     tols = c(10 ^ -4),
     tmax_hierarchy = holdout_out_tmax_hierarchy,
     recalculate_weights = c(TRUE),
@@ -59,14 +57,16 @@ if(matched_algo == 1) {
     lambdas = lambdas,
     k_samples = c(k_samples),
     k_features = c(k_features),
-    phi = c(phi),
     percent_noise = seq(0.025, 0.25, 0.025),
     recalculate_weights = TRUE,
     tols = c(1e-4),
-    tmax_outer = fit_tmax_hierarchy[1],
+    tmax_outer = 3 * fit_tmax_hierarchy[1],
     tmax_cobra = fit_tmax_hierarchy[2],
   )
 } else if(matched_algo == 2) {
+  holdout_out_tmax_hierarchy = c(2, 100, 200)
+  fit_tmax_hierarchy = holdout_out_tmax_hierarchy[2:3]
+
   result <- cv.BCBC_holdout(
     all_checkers[[ARRAY_ID]]$X,
     holdout_size = 0.25,
@@ -74,9 +74,8 @@ if(matched_algo == 1) {
     gammas = gammas,
     k_samples = c(k_samples),
     k_features = c(k_features),
-    phis = c(phi),
     tols = c(10 ^ -4),
-    tmax_hierarchy = c(2, 50, 200), # holdout_out_tmax_hierarchy,
+    tmax_hierarchy = holdout_out_tmax_hierarchy,
     recalculate_weights = c(FALSE),
     return_fits = debug
   )
@@ -91,12 +90,11 @@ if(matched_algo == 1) {
     lambdas = lambdas,
     k_samples = c(k_samples),
     k_features = c(k_features),
-    phi = c(phi),
     recalculate_weights = c(FALSE),
     percent_noise = seq(0.025, 0.25, 0.025),
     tols = c(1e-4),
-    tmax_outer = 300, # fit_tmax_hierarchy[1],
-    tmax_cobra = 200  # fit_tmax_hierarchy[2],
+    tmax_outer = 3 * fit_tmax_hierarchy[1],
+    tmax_cobra = fit_tmax_hierarchy[2]
   )
 } else if(matched_algo == 3) {
   result <- cv.BCBC_holdout(
@@ -106,7 +104,6 @@ if(matched_algo == 1) {
     gammas = gammas,
     k_samples = c(k_samples),
     k_features = c(k_features),
-    phis = c(phi),
     tols = c(10 ^ -4),
     tmax_hierarchy = holdout_out_tmax_hierarchy,
     recalculate_weights = c(TRUE),
@@ -129,7 +126,6 @@ if(matched_algo == 1) {
     lambdas = lambdas,
     k_samples = c(k_samples),
     k_features = c(k_features),
-    phis = c(phi),
     recalculate_weights = c(TRUE),
     tols = c(1e-4),
     approx_neighbors = c(TRUE),
@@ -139,7 +135,7 @@ if(matched_algo == 1) {
       M = 16,
       n_threads = 4
     ),
-    tmax_outer = fit_tmax_hierarchy[1],
+    tmax_outer = 3 * fit_tmax_hierarchy[1],
     tmax_cobra = fit_tmax_hierarchy[2]
   )
 } else if (matched_algo == 4) {
@@ -147,10 +143,9 @@ if(matched_algo == 1) {
   result <- bcel_stable(all_checkers[[ARRAY_ID]]$X, r = 5)
 } else if(matched_algo == 5) {
   wts <- fast_gkn_weights(
-    t(all_checkers[[ARRAY_ID]]$X),
+    all_checkers[[ARRAY_ID]]$X,
     k_row = k_features,
     k_col = k_samples,
-    phi = phi,
     approx = 0
   )
 
@@ -188,7 +183,7 @@ output_dir <- paste0(
   toupper(METHOD),
   "_",
   JOB_ID,
-  "/"
+  "_SNR/"
 )
 
 if (!dir.exists(output_dir)) {

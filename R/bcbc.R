@@ -26,12 +26,12 @@ projection_onto_simplex <- function(unproj, bound = 1) {
 
 #' Calculate the fusion term in the BCBC objective function
 #'
-#' @param edges output of affinity calculating function
-#' @param affinities output of affinity calculating function
+#' @param edges `sparseweights` object
 #' @param U input to fusion function
 #' @param rows logical value indicating to calculate over rows
 #'
 #' @seealso [fast_gkn_edges()] for Gaussian k-nearest neighbor affinities
+#' @seealso [knn_graph()] for Gaussian k-nearest neighbor affinities
 #' @return fusion value
 #' @export
 #'
@@ -42,12 +42,12 @@ projection_onto_simplex <- function(unproj, bound = 1) {
 #'                             num_col_clusters = 5,
 #'                             p_extra = 25,
 #'                             shuffle = FALSE)
-#' fusion_wts <- fast_gkn_weights(t(checker$X), k_row = 4, k_col = 4, phi = 1)
-#' calc_fusion_term(fusion_wts$unique_row_edges, fusion_wts$w_row, checker$X, rows=FALSE)
-#' calc_fusion_term(fusion_wts$unique_col_edges, fusion_wts$w_col, checker$X, rows=TRUE)
-calc_fusion_term <- function(edges, affinities, U, rows=TRUE) {
-  from_node <- edges$from_node
-  to_node <- edges$to_node
+#' fusion_wts <- fast_gkn_weights(checker$X, k_row = 4, k_col = 4)
+#' calc_fusion_term(fusion_wts$W_row, checker$X, rows=FALSE)
+#' calc_fusion_term(fusion_wts$W_col, checker$X, rows=TRUE)
+calc_fusion_term <- function(edges, U, rows=TRUE) {
+  from_node <- edges$keys[, 1]
+  to_node <- edges$keys[, 2]
 
   all_distances <- rep(NA, length(from_node))
   for(i in seq_along(from_node)) {
@@ -57,7 +57,7 @@ calc_fusion_term <- function(edges, affinities, U, rows=TRUE) {
       all_distances[i] = sqrt(sum((U[, from_node[i]] - U[, to_node[i]])^2))
     }
   }
-  return(sum(affinities * all_distances))
+  return(sum(edges$values * all_distances))
 }
 
 
@@ -86,7 +86,6 @@ w_coordinate_descent <- function(col_sum_sq, lambda) {
 #' @param k_features number of nearest neighbors used to calculate feature affinity graph
 #' @param k_samples number of nearest neighbors used to calculate sample affinity graph
 #' @param gamma fusion hyperparameter
-#' @param phi bandwidth of affinity graph kernel
 #' @param tmax number of max iterations for COBRA and PALM
 #' @param tmax_cobra number of max iterations for COBRA
 #' @param tmax_outer number of max iterations for PALM
@@ -102,7 +101,7 @@ w_coordinate_descent <- function(col_sum_sq, lambda) {
 #' @return list for BCBC fit including
 #'   1. `U` fitted matrix
 #'   1. `w` fitted weights
-#'   1. `lambda`, `gamma`, `k_features`, `k_samples`, `phi`, `recalculate_weights`  input parameters
+#'   1. `lambda`, `gamma`, `k_features`, `k_samples`, `recalculate_weights`  input parameters
 #'   1. `cobra_diffs` difference in `U` iterates
 #'   1. `w_diffs` difference in `w` iterates
 #'   1. `w_path` all `w` iterates
@@ -137,7 +136,6 @@ BCBC <- function(X,
                  k_features = 4,
                  k_samples = 4,
                  gamma = 10,
-                 phi = 1,
                  tmax = NA, # Set this to set both below
                  tmax_cobra = 100,
                  tmax_outer = 100,
@@ -185,10 +183,9 @@ BCBC <- function(X,
 
   if(!is.list(fusion_wts)) {  # If not given first iteration weights, calculate them
     fusion_wts <- fast_gkn_weights(
-      t(X),
-      k_row = k_features,
-      k_col = k_samples,
-      phi = phi,
+      X,
+      k_row = k_samples,
+      k_col = k_features,
       approximate = approx_neighbors,
       hnsw_args = hnsw_args
     )
@@ -199,19 +196,18 @@ BCBC <- function(X,
 
     if (recalculate_weights && t > 1) {
       fusion_wts <- fast_gkn_weights(
-        t(U_step),  # After first step, use U_step here since that is the input to COBRA
-        k_row = k_features,
-        k_col = k_samples,
-        phi = phi,
+        U_step,  # After first step, use U_step here since that is the input to COBRA
+        k_row = k_samples,
+        k_col = k_features,
         approximate = approx_neighbors,
         hnsw_args = hnsw_args
       )
 
-      row_fusion <- fusion_wts$row_fusion
-      col_fusion <- fusion_wts$col_fusion
-      if(min(fusion_wts$w_row) <= 0 || min(fusion_wts$w_col) <= 0) {
+      row_fusion <- fusion_wts$W_row$fusion
+      col_fusion <- fusion_wts$W_col$fusion
+      if(min(fusion_wts$W_row$values) <= 0 || min(fusion_wts$W_col$values) <= 0) {
         warning(paste(
-          "U has diverged, try increasing k_features, k_samples or decreasing phi",
+          "U has diverged, try increasing k_features, k_samples",
           "arguments to encourage fusion terms.",
           "Returning current step"))
         rss_vals[t] <- sum(sweep(X - U, 2, sqrt(w ^ 2 + lambda * w), "*") ^ 2)
@@ -220,8 +216,8 @@ BCBC <- function(X,
         break
       }
     } else {
-      row_fusion <- calc_fusion_term(fusion_wts$unique_row_edges, fusion_wts$w_row, U, rows=FALSE)
-      col_fusion <- calc_fusion_term(fusion_wts$unique_col_edges, fusion_wts$w_col, U, rows=TRUE)
+      row_fusion <- calc_fusion_term(fusion_wts$W_row, U, rows=TRUE)
+      col_fusion <- calc_fusion_term(fusion_wts$W_col, U, rows=FALSE)
     }
     col_fusion_vals[t] <- col_fusion
     row_fusion_vals[t] <- row_fusion
@@ -238,18 +234,16 @@ BCBC <- function(X,
       break
     }
 
-    # Cobra has rows as features, columns as samples
     cobra_result <-
-      cobra(t(U_step),
-            fusion_wts$E_row,
-            fusion_wts$E_col,
-            fusion_wts$w_row,
-            fusion_wts$w_col,
+      cobra(U_step,
             gamma = gamma,
+            W_row = fusion_wts$W_row,
+            W_col = fusion_wts$W_col,
             max_iter = tmax_cobra,
-            tol=tol)
+            max_iter_inner = 5 * tmax_cobra,
+            tol = tol)
 
-    U_prime <- t(cobra_result$U[[1]])
+    U_prime <- cobra_result
     U_diff <- sum(abs(U_prime - U)) / sum(abs(U_prime))
     cobra_diffs[t] <- U_diff
     if (t > 1 && U_diff < tol) {
@@ -265,7 +259,6 @@ BCBC <- function(X,
     nu_w = 1/(1.1 * lipschitz_fixed_U)
 
     w_prime <- projection_onto_simplex(w - nu_w * (w + lambda / 2) * col_sum_sq)
-    # w_prime <- projection_onto_simplex(w - nu_w / sqrt(p) * col_sum_sq)
 
     w_diff <- sum((w_prime - w) ^ 2)
     w_diffs[t] <- w_diff
@@ -291,7 +284,6 @@ BCBC <- function(X,
     gamma = gamma,
     k_features = k_features,
     k_samples = k_samples,
-    phi = phi,
     recalculate_weights = recalculate_weights,
     cobra_diffs = cobra_diffs,
     w_diffs = w_diffs,

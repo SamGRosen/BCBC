@@ -17,8 +17,7 @@ X <- scale(X)
 # BCBC params
 k_samples = 10
 k_features = 25
-phi = 1
-tmax_hierarchy = c(5, 75, 300)
+tmax_hierarchy = c(5, 75, 500)
 fit_tmax_hierarchy = c(6 * tmax_hierarchy[2], tmax_hierarchy[3])
 
 p <- ncol(X)
@@ -37,9 +36,8 @@ if(matched_algo == 1) {
     k_samples = k_samples,
     k_features = k_features,
     gamma = global_gamma,
-    phi = phi,
     tmax_hierarchy = tmax_hierarchy,
-    tol = 1e-10,
+    tol = 1e-8,
     recalculate_weights = TRUE,
     return_fits = debug
   )
@@ -55,10 +53,9 @@ if(matched_algo == 1) {
     lambdas = lambdas,
     k_samples = c(k_samples),
     k_features = c(k_features),
-    phis = c(phi),
     percent_noise = seq(0.025, 0.50, 0.025),
     recalculate_weights = c(TRUE),
-    tols = c(1e-4),
+    tols = c(1e-5),
     tmax_outer = fit_tmax_hierarchy[1],
     tmax_cobra = fit_tmax_hierarchy[2]
   )
@@ -69,7 +66,6 @@ if(matched_algo == 1) {
     k_samples = k_samples,
     k_features = k_features,
     gamma = global_gamma,
-    phi = phi,
     tmax_hierarchy = tmax_hierarchy,
     tol = 1e-10,
     recalculate_weights = FALSE,
@@ -85,7 +81,6 @@ if(matched_algo == 1) {
     lambdas = lambdas,
     k_samples = c(k_samples),
     k_features = c(k_features),
-    phis = c(phi),
     percent_noise = seq(0.025, 0.50, 0.025),
     recalculate_weights = c(FALSE),
     tols = c(1e-4),
@@ -99,7 +94,6 @@ if(matched_algo == 1) {
     k_samples = k_samples,
     k_features = k_features,
     gamma = global_gamma,
-    phi = phi,
     tmax_hierarchy = tmax_hierarchy,
     tol = 1e-10,
     recalculate_weights = TRUE,
@@ -121,7 +115,6 @@ if(matched_algo == 1) {
     lambdas = lambdas,
     k_samples = c(k_samples),
     k_features = c(k_features),
-    phis = c(phi),
     recalculate_weights = c(TRUE),
     tols = c(1e-4),
     tmax_outer = fit_tmax_hierarchy[1],

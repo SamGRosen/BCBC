@@ -12,7 +12,6 @@ cv.BCBC_holdout(
   gammas = c(1),
   k_samples = c(2),
   k_features = c(2),
-  phis = c(0.5),
   recalculate_weights = c(FALSE),
   approx_neighbors = c(FALSE),
   hnsw_args = list(),
@@ -34,8 +33,6 @@ cv.BCBC_holdout(
 \item{k_samples}{passed to \code{BCBC_missing}}
 
 \item{k_features}{passed to \code{BCBC_missing}}
-
-\item{phis}{passed to \code{BCBC_missing}}
 
 \item{recalculate_weights}{passed to \code{BCBC_missing}}
 

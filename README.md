@@ -114,6 +114,6 @@ install.packages("biclust")
 install.packages("s4vd")
 install.packages("dynamicTreeCut")
 
-# ideally one should download and install from source
 devtools::install_github("yanzhong07/BCEL") 
+devtools::install_github("cran/cvxbiclustr") 
 ```

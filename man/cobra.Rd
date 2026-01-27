@@ -2,63 +2,51 @@
 % Please edit documentation in R/cobra.r
 \name{cobra}
 \alias{cobra}
-\title{Convex Biclustering Algorithm}
+\title{Dykstra-like proximal algorithm from Convex Biclustering by Chi et al.}
 \usage{
-cobra(X, E_row, E_col, w_row, w_col, gamma, max_iter = 100, tol = 0.001)
+cobra(
+  X,
+  gamma,
+  W_row,
+  W_col,
+  max_iter = 100,
+  max_iter_inner = 100,
+  tol = 1e-04
+)
 }
 \arguments{
-\item{X}{The data matrix to be clustered. The rows are the features, and the columns are the samples.}
+\item{X}{data matrix}
 
-\item{E_row}{Edge-incidence matrix for row graph}
+\item{gamma}{regularization parameter}
 
-\item{E_col}{Edge-incidence matrix for column graph}
+\item{W_row}{\code{sparseweights} object output from \code{knn_graph} for row fusion}
 
-\item{w_row}{Vector of weights for row graph}
+\item{W_col}{\code{sparseweights} object output from \code{knn_graph} for col fusion}
 
-\item{w_col}{Vector of weights for column graph}
+\item{max_iter}{number of convex cluster optimizations to solve}
 
-\item{gamma}{A sequence of regularization parameters for row and column shrinkage}
+\item{max_iter_inner}{number of inner iterations for \code{CCMMR}}
 
-\item{max_iter}{Maximum number of iterations}
-
-\item{tol}{Stopping criterion}
+\item{tol}{of convergence}
+}
+\value{
+fitted bicluster matrix
 }
 \description{
-\code{cobra} computes a convex biclustering path via Dykstra-like Proximal Algorithm
+Dykstra-like proximal algorithm from Convex Biclustering by Chi et al.
 }
 \examples{
-## Create bicluster path
-## Example: Lung
-X <- lung
-X <- X - mean(X)
-X <- X/norm(X,'f')
+checker <- gen_checkerboard(100, 150, 5, 5, p_extra = 0, shuffle = FALSE)
+W_row <- knn_graph(checker$X, 5)
+W_col <- knn_graph(t(checker$X), 5)
+cobra_fit <- cobra(checker$X, gamma = 10000, W_row = W_row, W_col = W_col)
 
-## Create annotation for heatmap
-types <- colnames(lung)
-ty <- as.numeric(factor(types))
-cols <- rainbow(4)
-YlGnBu5 <- c('#ffffd9','#c7e9b4','#41b6c4','#225ea8','#081d58')
-hmcols <- colorRampPalette(YlGnBu5)(256)
+plot_fit(matrix_fit_to_df(cobra_fit))
+}
+\seealso{
+\code{\link[=fast_gkn_weights]{fast_gkn_weights()}}
 
-## Construct weights and edge-incidence matrices
-phi <- 0.5; k <- 5
-wts <- gkn_weights(X,phi=phi,k_row=k,k_col=k)
-w_row <- wts$w_row
-w_col <- wts$w_col
-E_row <- wts$E_row
-E_col <- wts$E_col
+\code{\link[=knn_graph]{knn_graph()}}
 
-## Connected Components of Row and Column Graphs
-wts$nRowComp
-wts$nColComp
-
-#### Initialize path parameters and structures
-nGamma <- 5
-gammaSeq <- 10**seq(0,3,length.out=nGamma)
-
-## Generate solution path
-sol <- cobra_validate(X,E_row,E_col,w_row,w_col,gammaSeq)
-
-ix <- 4
-heatmap(sol$U[[ix]],col=hmcols,labRow=NA,labCol=NA,ColSideCol=cols[ty])
+\code{\link[=knn_graph_approx]{knn_graph_approx()}}
 }
