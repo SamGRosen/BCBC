@@ -1,6 +1,8 @@
 library(dplyr)
 library(BCBC)
 library(clusterSim)
+library(aricode)
+library(ROCR)
 
 generate_checkers <- function(seed=2024, only=NA) {
   set.seed(seed)
@@ -67,37 +69,6 @@ generate_checkers_SNR <- function(seed=2024) {
   all_checkers
 }
 
-generate_checkers_equal <- function(seed=2024) {
-  set.seed(seed)
-  all_checkers <- list()
-  trials <- 1
-
-  noise_levels <- c(1, 2, 5, 10)
-  cluster_spreads <- c(5, 10, 20, 50)
-  i <- 1
-  for (trial in 1:trials) {
-    for (cluster_spread in cluster_spreads) {
-      for (noise_level in noise_levels) {
-        all_checkers[[i]] <- gen_checkerboard(
-          100,
-          100,
-          5,
-          5,
-          noise = noise_level,
-          cluster_spread = cluster_spread,
-          p_extra = 300,
-          prob_empty = 0,
-          equally_spaced = TRUE,
-          shuffle = FALSE
-        )
-        all_checkers[[i]]$trial = trial
-        i <- i + 1
-      }
-    }
-  }
-  all_checkers
-}
-
 overlap_to_groups <- function(row_memberships, col_memberships) {
   row_membership_df <- data.frame(row_memberships)
   unique_row_groups <- row_membership_df |>
@@ -130,8 +101,6 @@ overlap_to_groups <- function(row_memberships, col_memberships) {
   )
 }
 
-
-metrics <- c("vi", "nmi", "split.join", "rand", "adjusted.rand")
 evaluate_checker <- function(checker,
                              fitted_mat,
                              row_groups,
@@ -183,20 +152,19 @@ evaluate_checker <- function(checker,
   true_biclusters <- outer(checker$row_partition, checker$col_partition[true_feature_indices], paste)
   assigned_biclusters <- outer(row_groups, col_groups, paste)
   assigned_biclusters_true <- outer(row_groups, col_groups[true_feature_indices], paste)
-  for (metric in metrics) {
-    row_result <- safe_compare(row_groups, checker$row_partition, metric)
-    col_result <- safe_compare(col_groups, checker$col_partition, metric)
-    col_result_true <- safe_compare(col_groups[true_feature_indices], checker$col_partition[true_feature_indices], metric)
 
-    bicluster_result <- safe_compare(assigned_biclusters, checker_biclusters, metric)
-    bicluster_result_true <- safe_compare(assigned_biclusters_true, true_biclusters, metric)
+  row_result <- ARI(row_groups, checker$row_partition)
+  col_result <- ARI(col_groups, checker$col_partition)
+  col_result_true <- ARI(col_groups[true_feature_indices], checker$col_partition[true_feature_indices])
 
-    to_return[[paste(metric, "row", sep = "_")]] <- row_result
-    to_return[[paste(metric, "col", sep = "_")]] <- col_result
-    to_return[[paste(metric, "col_true", sep = "_")]] <- col_result_true
-    to_return[[paste(metric, "bicluster", sep = "_")]] <- bicluster_result
-    to_return[[paste(metric, "bicluster_true", sep = "_")]] <- bicluster_result_true
-  }
+  bicluster_result <- ARI(c(assigned_biclusters), c(checker_biclusters))
+  bicluster_result_true <- ARI(c(assigned_biclusters_true), c(true_biclusters))
+
+  to_return[["ARI_row"]] <- row_result
+  to_return[["ARI_col"]] <- col_result
+  to_return[["ARI_col_true"]] <- col_result_true
+  to_return[["ARI_bicluster"]] <- bicluster_result
+  to_return[["ARI_bicluster_true"]] <- bicluster_result_true
 
   if(is.null(fitted_mat)) {
     to_return$true_err <- NA
@@ -285,11 +253,11 @@ cobra_preprocess_extractor <- function(cobra_result) {
   U = t(cobra_result$U[[1]])
   hopefully_p = ceiling(max(cobra_result$top_200) / 100) * 100
   empty = matrix(0, nrow=nrow(U), ncol = hopefully_p)
-  print(dim(empty))
   empty[, cobra_result$top_200] = U
   weights = rep(0, hopefully_p)
-  weights[cobra_result$top_200] = 1/200
+  weights[cobra_result$top_200] = 1
 
+  # TODO find best percent noise over range
   cobra_clusters = bicluster_assignments(empty,
                                          weights = weights,
                                          lambda = 0,

@@ -6,19 +6,22 @@ library(sparseBC)
 library(s4vd)
 library(biclust)
 library(SCBiclust)
-library(future.apply)
+# library(BCEL)
 
-# install.packages("../BCEL", repos = NULL, type="source")
-# library(BCEL)  # https://github.com/SamGRosen/BCEL, need to compile from source
-
-plan(sequential, split=TRUE)
+source("./simulation_helpers.R")
 ```
 
 # Data
 
 ```{r}
 SAVE_RESULTS = TRUE
-all_checkers <- generate_checkers(2024)
+SAVE_PATH = "./rds_files/"
+SNR = TRUE
+if(SNR) {
+  all_checkers <- generate_checkers_SNR(2024)
+} else {
+  all_checkers <- generate_checkers(2024)
+}
 ```
 
 # S4VD
@@ -48,7 +51,7 @@ for(checker in 1:length(all_checkers)) {
 }
 
 if(SAVE_RESULTS) {
-  saveRDS(all_s4vd_results, paste0("./rds_files/all_s4vd_results", Sys.time(), ".RDS"))
+  saveRDS(all_s4vd_results, paste0(SAVE_PATH, "all_s4vd_results", Sys.time(), ".RDS"))
 }
 ```
 
@@ -97,26 +100,26 @@ for(checker in 1:160) {
 }
 
 if(SAVE_RESULTS) {
-  saveRDS(all_sparsebc_results, paste0("./rds_files/all_sparsebc_results_with_cv", Sys.time(), ".RDS"))
+  saveRDS(all_sparsebc_results, paste0(SAVE_PATH, "all_sparsebc_results_with_cv", Sys.time(), ".RDS"))
 }
 ```
 
 # SCBiclust
 
 ```{r}
-# all_scbiclust_results = list()
-# for(checker in 1:length(all_checkers)) {
-#   print(c(checker, as.character(Sys.time())))
-# 
-#   all_scbiclust_results[[checker]] <-
-#     PermBiclust.sigclust_stop(all_checkers[[checker]]$X,
-#                               sc = FALSE,
-#                               silent = TRUE,
-#                               maxnum.bicluster = 6)
-# }
+all_scbiclust_results = list()
+for(checker in 1:length(all_checkers)) {
+  print(c(checker, as.character(Sys.time())))
+
+  all_scbiclust_results[[checker]] <-
+    PermBiclust.sigclust_stop(all_checkers[[checker]]$X,
+                              sc = FALSE,
+                              silent = TRUE,
+                              maxnum.bicluster = 6)
+}
 
 if(SAVE_RESULTS) {
-  saveRDS(all_scbiclust_results, paste0("./rds_files/all_scbiclust_results_cv", Sys.time(), ".RDS"))
+  saveRDS(all_scbiclust_results, paste0(SAVE_PATH, "all_scbiclust_results_cv", Sys.time(), ".RDS"))
 }
 
 ```
@@ -170,7 +173,7 @@ for (checker in 1:length(all_checkers)) {
 }
 
 if(SAVE_RESULTS) {
-  saveRDS(all_bcplaid_results, paste0("./rds_files/all_bcplaid_results", Sys.time(), ".RDS"))
+  saveRDS(all_bcplaid_results, paste0(SAVE_PATH, "all_bcplaid_results", Sys.time(), ".RDS"))
 }
 ```
 
@@ -202,45 +205,6 @@ for(checker in 1:length(all_checkers)) {
 }
 
 if(SAVE_RESULTS) {
-  saveRDS(all_dct_results, paste0("./rds_files/all_dct_results", Sys.time(), ".RDS"))
-}
-```
-
-
-# Manual Threshold
-
-
-```{r}
-
-all_threshold_results = list()
-for(checker in 1:length(all_checkers)) {
-  print(c(checker, as.character(Sys.time())))
-  row_dist <- dist(all_checkers[[checker]]$X)
-  row_threshold <- get_threshold_for_k_components(
-    row_dist,
-    k = 5,
-    max_threshold = max(row_dist),
-    maxiter = 100
-  )
-  
-  col_dist <- dist(t(all_checkers[[checker]]$X))
-  col_threshold <- get_threshold_for_k_components(
-    col_dist,
-    k = 5,
-    max_threshold = max(col_dist),
-    maxiter = 100
-  )
-
-  row_groups <- dbscan::comps(dbscan::frNN(row_dist, row_threshold, sort = F))
-  col_groups <- dbscan::comps(dbscan::frNN(col_dist, row_threshold, sort = F))
-  all_threshold_results[[checker]] <- list(
-    row_groups = row_groups,
-    col_groups = col_groups,
-    fitted_mat = NULL
-  )
-}
-
-if(SAVE_RESULTS) {
-  saveRDS(all_threshold_results, paste0("./rds_files/all_threshold_results", Sys.time(), ".RDS"))
+  saveRDS(all_dct_results, paste0(SAVE_PATH, "all_dct_results", Sys.time(), ".RDS"))
 }
 ```
