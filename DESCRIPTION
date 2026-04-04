@@ -14,4 +14,5 @@ Imports:
     Matrix,
     dbscan,
     tidyr,
-    dplyr
+    dplyr,
+    RcppHNSW
