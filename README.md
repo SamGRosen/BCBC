@@ -1,6 +1,6 @@
 # BCBC
 
-Code for Biconvex Biclustering
+Code for Biconvex Biclustering from https://arxiv.org/abs/2604.03936
 
 ## Installation
 
@@ -116,4 +116,20 @@ install.packages("dynamicTreeCut")
 
 devtools::install_github("yanzhong07/BCEL") 
 devtools::install_github("cran/cvxbiclustr") 
+```
+
+## Citation
+
+Please cite the following paper when using the code from this repository:
+
+```
+@misc{rosen2026biconvexbiclustering,
+      title={Biconvex Biclustering}, 
+      author={Sam Rosen and Eric C. Chi and Jason Xu},
+      year={2026},
+      eprint={2604.03936},
+      archivePrefix={arXiv},
+      primaryClass={stat.ML},
+      url={https://arxiv.org/abs/2604.03936}, 
+}
 ```
